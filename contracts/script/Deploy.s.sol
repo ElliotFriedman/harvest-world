@@ -8,13 +8,31 @@ import {HarvestDeployer} from "./deployers/HarvestDeployer.sol";
 contract Deploy is Script {
     using stdJson for string;
 
+    function _findAddress(string memory json, string memory name) internal pure returns (address) {
+        // Parse the array and find the entry with matching name
+        bytes memory rawEntries = json.parseRaw("$");
+        Entry[] memory entries = abi.decode(rawEntries, (Entry[]));
+        for (uint256 i; i < entries.length; i++) {
+            if (keccak256(bytes(entries[i].name)) == keccak256(bytes(name))) {
+                return entries[i].addr;
+            }
+        }
+        revert(string.concat("Address not found: ", name));
+    }
+
+    struct Entry {
+        address addr;
+        bool isContract;
+        string name;
+    }
+
     function run() external {
         string memory json = vm.readFile("addresses/480.json");
 
-        address usdc = json.readAddress(".tokens.USDC");
-        address morphoVaultAddr = json.readAddress(".morpho.re7USDCVault");
-        address merklDistributor = json.readAddress(".merkl.distributor");
-        address morphoToken = json.readAddress(".tokens.MORPHO");
+        address usdc = _findAddress(json, "USDC");
+        address morphoVaultAddr = _findAddress(json, "MORPHO_RE7_USDC_VAULT");
+        address merklDistributor = _findAddress(json, "MERKL_DISTRIBUTOR");
+        address morphoToken = _findAddress(json, "MORPHO");
 
         address strategyFactory = vm.envAddress("STRATEGY_FACTORY");
         address beefySwapper = vm.envAddress("BEEFY_SWAPPER");
