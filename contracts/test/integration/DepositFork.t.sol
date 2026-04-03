@@ -26,6 +26,10 @@ contract DepositForkTest is Test {
     address internal constant WLD = 0x2cFc85d8E48F8EAB294be644d9E25C3030863003;
     IAllowanceTransfer internal constant PERMIT2 = IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
+    // ── Deployed Harvest contracts (from 480.json) ─────────────────────────
+    address internal constant DEPLOYED_VAULT = 0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD;
+    address payable internal constant DEPLOYED_STRATEGY = payable(0xd2753e1Ce625A776A4d73f0251419Ba5Dfc1c0A5);
+
     // ── Deployed system ───────────────────────────────────────────────────────
     BeefyVaultV7 internal vault;
     StrategyMorphoMerkl internal strategy;
@@ -48,19 +52,25 @@ contract DepositForkTest is Test {
 
     function setUp() public {
         string memory rpcUrl = vm.envOr("WORLD_CHAIN_RPC_URL", string("https://worldchain.drpc.org"));
-
-        // Pin to a recent block so all tests in a run share the same cached state.
-        uint256 forkBlock = vm.envOr("WORLD_CHAIN_FORK_BLOCK", uint256(27956180));
-        worldChainFork = vm.createFork(rpcUrl, forkBlock);
+        worldChainFork = vm.createFork(rpcUrl);
         vm.selectFork(worldChainFork);
 
-        owner = makeAddr("owner");
-        strategist = makeAddr("strategist");
-        feeRecipient = makeAddr("feeRecipient");
         user = makeAddr("user");
 
-        _deployInfrastructure();
-        _deploySystem();
+        // Use deployed contracts if they exist on-chain, otherwise deploy fresh
+        if (DEPLOYED_VAULT.code.length > 0) {
+            vault = BeefyVaultV7(DEPLOYED_VAULT);
+            strategy = StrategyMorphoMerkl(DEPLOYED_STRATEGY);
+            owner = vault.owner();
+        } else {
+            owner = makeAddr("owner");
+            strategist = makeAddr("strategist");
+            feeRecipient = makeAddr("feeRecipient");
+            _deployInfrastructure();
+            vm.startPrank(owner);
+            _deploySystem();
+            vm.stopPrank();
+        }
 
         // Mark user as verified human (bypass World ID for test)
         _setVerifiedInTest(user, true);
