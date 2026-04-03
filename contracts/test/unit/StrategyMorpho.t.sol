@@ -81,6 +81,7 @@ contract StrategyMorphoMerklTest is BaseTest {
         _depositAs(user, 1000e6);
         deal(address(rewardToken), address(strategy), 100 ether);
 
+        vm.prank(owner);
         strategy.harvest();
 
         assertGt(strategy.lastHarvest(), 0);
@@ -93,6 +94,7 @@ contract StrategyMorphoMerklTest is BaseTest {
         deal(address(rewardToken), address(strategy), 1 ether);
 
         skip(1 days);
+        vm.prank(owner);
         strategy.harvest();
 
         assertEq(strategy.lastHarvest(), block.timestamp);
@@ -102,6 +104,7 @@ contract StrategyMorphoMerklTest is BaseTest {
         _depositAs(user, 1000e6);
 
         // No rewards — harvest should not revert, just skip
+        vm.prank(owner);
         strategy.harvest();
 
         // lastHarvest stays 0 since nativeBal <= minAmounts[NATIVE]
@@ -117,6 +120,7 @@ contract StrategyMorphoMerklTest is BaseTest {
         _simulateYield(1.05e18);
 
         skip(1 days);
+        vm.prank(owner);
         strategy.harvest();
 
         // After harvest, lockDuration applies — wait for profit to unlock
@@ -131,6 +135,7 @@ contract StrategyMorphoMerklTest is BaseTest {
         _depositAs(user, 1000e6);
         deal(address(rewardToken), address(strategy), 10 ether);
 
+        vm.prank(owner);
         strategy.harvest();
 
         uint256 lockedImmediately = strategy.lockedProfit();
@@ -199,13 +204,13 @@ contract StrategyMorphoMerklTest is BaseTest {
 
     // ── Access control ────────────────────────────────────────────────────────
 
-    function test_harvest_is_public() public {
+    function test_harvest_reverts_for_non_manager() public {
         _depositAs(user, 1000e6);
         deal(address(rewardToken), address(strategy), 1 ether);
 
-        // Anyone can call harvest (incentivized by tx.origin receiving call fee in future)
         address anyone = makeAddr("anyone");
         vm.prank(anyone);
+        vm.expectRevert(BaseAllToNativeFactoryStrat.NotManager.selector);
         strategy.harvest();
     }
 

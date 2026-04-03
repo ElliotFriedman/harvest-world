@@ -25,11 +25,6 @@
         "isContract": true
     },
     {
-        "addr": "0xe2108e43dBD43c9Dc6E494F86c4C4D938Bd10f56",
-        "name": "MORPHO_TOKEN",
-        "isContract": true
-    },
-    {
         "addr": "0xe741bc7c34758b4cae05062794e8ae24978af432",
         "name": "MORPHO_BLUE",
         "isContract": true

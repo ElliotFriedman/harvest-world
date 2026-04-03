@@ -151,7 +151,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     /**
      * @dev A helper function to call withdraw() with all the sender's funds.
      */
-    function withdrawAll() external {
+    function withdrawAll() external onlyHuman {
         withdraw(balanceOf(msg.sender));
     }
 
@@ -160,7 +160,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * from the strategy and pay up the token holder. A proportional number of IOU
      * tokens are burned in the process.
      */
-    function withdraw(uint256 _shares) public {
+    function withdraw(uint256 _shares) public onlyHuman {
         uint256 r = (balance() * _shares) / totalSupply();
         _burn(msg.sender, _shares);
 

@@ -23,7 +23,7 @@ contract DepositForkTest is Test {
     address internal constant WETH = 0x4200000000000000000000000000000000000006;
     address internal constant MORPHO_RE7_USDC_VAULT = 0xb1E80387EbE53Ff75a89736097D34dC8D9E9045B;
     address internal constant MERKL_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
-    address internal constant MORPHO_TOKEN = 0xe2108e43dBD43c9Dc6E494F86c4C4D938Bd10f56;
+    address internal constant WLD = 0x2cFc85d8E48F8EAB294be644d9E25C3030863003;
     IAllowanceTransfer internal constant PERMIT2 = IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
     // ── Deployed system ───────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ contract DepositForkTest is Test {
 
     function _deploySystem() internal {
         address[] memory rewards = new address[](1);
-        rewards[0] = MORPHO_TOKEN;
+        rewards[0] = WLD;
 
         HarvestDeployer.ExternalAddresses memory ext = HarvestDeployer.ExternalAddresses({
             want: USDC,
