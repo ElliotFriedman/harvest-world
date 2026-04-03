@@ -1,0 +1,56 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createPublicClient, http } from "viem";
+
+// Server-only — RPC_URL never exposed to browser
+const RPC_URL = process.env.RPC_URL || "https://worldchain.drpc.org";
+
+const client = createPublicClient({
+  chain: { id: 480, name: "World Chain", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [RPC_URL] } } },
+  transport: http(RPC_URL),
+});
+
+const USDC = "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" as const;
+const VAULT = "0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD" as const;
+
+const balanceOfAbi = [{ inputs: [{ name: "account", type: "address" }], name: "balanceOf", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" }] as const;
+const vaultAbi = [
+  { inputs: [{ name: "account", type: "address" }], name: "balanceOf", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "getPricePerFullShare", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "balance", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
+] as const;
+
+export async function GET(req: NextRequest) {
+  const wallet = req.nextUrl.searchParams.get("wallet") as `0x${string}` | null;
+
+  // If no wallet, just return TVL + pricePerShare
+  if (!wallet) {
+    const results = await client.multicall({
+      contracts: [
+        { address: VAULT, abi: vaultAbi, functionName: "getPricePerFullShare" },
+        { address: VAULT, abi: vaultAbi, functionName: "balance" },
+      ],
+    });
+    return NextResponse.json({
+      usdcBalance: "0",
+      vaultShares: "0",
+      pricePerShare: (results[0].result ?? BigInt("1000000000000000000")).toString(),
+      tvl: (results[1].result ?? BigInt(0)).toString(),
+    });
+  }
+
+  const results = await client.multicall({
+    contracts: [
+      { address: USDC, abi: balanceOfAbi, functionName: "balanceOf", args: [wallet] },
+      { address: VAULT, abi: vaultAbi, functionName: "balanceOf", args: [wallet] },
+      { address: VAULT, abi: vaultAbi, functionName: "getPricePerFullShare" },
+      { address: VAULT, abi: vaultAbi, functionName: "balance" },
+    ],
+  });
+
+  return NextResponse.json({
+    usdcBalance: (results[0].result ?? BigInt(0)).toString(),
+    vaultShares: (results[1].result ?? BigInt(0)).toString(),
+    pricePerShare: (results[2].result ?? BigInt("1000000000000000000")).toString(),
+    tvl: (results[3].result ?? BigInt(0)).toString(),
+  });
+}
