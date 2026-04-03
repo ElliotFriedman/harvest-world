@@ -23,8 +23,8 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     // WETH on World Chain (chain ID 480)
     address public constant NATIVE = 0x4200000000000000000000000000000000000006;
 
-    // 5% performance fee on harvested yield
-    uint256 public constant HARVEST_FEE = 0.05 ether;
+    // 0% performance fee for hackathon — all harvested yield goes to depositors
+    uint256 public constant HARVEST_FEE = 0;
 
     uint256 constant DIVISOR = 1 ether;
 

@@ -84,8 +84,8 @@ contract StrategyMorphoMerklTest is BaseTest {
         strategy.harvest();
 
         assertGt(strategy.lastHarvest(), 0);
-        // 5% fee in WETH sent to feeRecipient
-        assertGt(native.balanceOf(feeRecipient), 0);
+        // 0% fee for hackathon — no WETH sent to feeRecipient
+        assertEq(native.balanceOf(feeRecipient), 0);
     }
 
     function test_harvest_sets_last_harvest_timestamp() public {
