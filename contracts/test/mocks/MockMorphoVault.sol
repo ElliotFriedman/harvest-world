@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin-4/contracts/interfaces/IERC4626.sol";
+import {ERC20, IERC20Metadata} from "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20, IERC20} from "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC4626} from "@openzeppelin-4/contracts/interfaces/IERC4626.sol";
 
 /// @dev Minimal ERC4626 mock with a configurable exchange rate.
 ///      setExchangeRate(1.05e18) simulates 5% yield accrual.
 contract MockMorphoVault is ERC20, IERC4626 {
     using SafeERC20 for IERC20;
 
-    IERC20 private immutable _underlying;
-    uint8 private immutable _assetDecimals;
+    IERC20 private immutable _UNDERLYING;
+    uint8 private immutable _ASSET_DECIMALS;
 
     /// @notice Shares-to-assets rate, scaled by 1e18. Starts at 1:1.
     uint256 public exchangeRate;
@@ -19,19 +19,19 @@ contract MockMorphoVault is ERC20, IERC4626 {
     constructor(address asset_, string memory name_, string memory symbol_, uint8 assetDecimals_)
         ERC20(name_, symbol_)
     {
-        _underlying = IERC20(asset_);
-        _assetDecimals = assetDecimals_;
+        _UNDERLYING = IERC20(asset_);
+        _ASSET_DECIMALS = assetDecimals_;
         exchangeRate = 1e18;
     }
 
     // ── IERC4626 metadata ────────────────────────────────────────────────────
 
     function asset() external view override returns (address) {
-        return address(_underlying);
+        return address(_UNDERLYING);
     }
 
     function decimals() public view override(ERC20, IERC20Metadata) returns (uint8) {
-        return _assetDecimals;
+        return _ASSET_DECIMALS;
     }
 
     // ── IERC4626 accounting ──────────────────────────────────────────────────
@@ -84,14 +84,14 @@ contract MockMorphoVault is ERC20, IERC4626 {
 
     function deposit(uint256 assets, address receiver) external override returns (uint256 shares) {
         shares = previewDeposit(assets);
-        _underlying.safeTransferFrom(msg.sender, address(this), assets);
+        _UNDERLYING.safeTransferFrom(msg.sender, address(this), assets);
         _mint(receiver, shares);
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
     function mint(uint256 shares, address receiver) external override returns (uint256 assets) {
         assets = previewMint(shares);
-        _underlying.safeTransferFrom(msg.sender, address(this), assets);
+        _UNDERLYING.safeTransferFrom(msg.sender, address(this), assets);
         _mint(receiver, shares);
         emit Deposit(msg.sender, receiver, assets, shares);
     }
@@ -99,14 +99,14 @@ contract MockMorphoVault is ERC20, IERC4626 {
     function withdraw(uint256 assets, address receiver, address owner_) external override returns (uint256 shares) {
         shares = previewWithdraw(assets);
         _burn(owner_, shares);
-        _underlying.safeTransfer(receiver, assets);
+        _UNDERLYING.safeTransfer(receiver, assets);
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
     }
 
     function redeem(uint256 shares, address receiver, address owner_) external override returns (uint256 assets) {
         assets = previewRedeem(shares);
         _burn(owner_, shares);
-        _underlying.safeTransfer(receiver, assets);
+        _UNDERLYING.safeTransfer(receiver, assets);
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
     }
 

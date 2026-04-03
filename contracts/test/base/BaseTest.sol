@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
 
 import {HarvestDeployer} from "../../script/deployers/HarvestDeployer.sol";
@@ -141,6 +141,8 @@ abstract contract BaseTest is Test {
         deal(address(want), depositor, amount);
         vm.startPrank(depositor);
         want.approve(PERMIT2_ADDR, amount);
+        // casting to 'uint160' is safe because test deposit amounts are bounded by real token supplies (< 2^160)
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.approve(address(want), address(vault), uint160(amount), uint48(block.timestamp + 1 days));
         vault.deposit(amount);
         vm.stopPrank();

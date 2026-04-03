@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {HarvestDeployer} from "./deployers/HarvestDeployer.sol";
 import {MockStrategyFactory} from "../test/mocks/MockStrategyFactory.sol";
@@ -29,6 +29,7 @@ contract Deploy is Script {
     }
 
     function run() external {
+        // forge-lint: disable-next-line(unsafe-cheatcode)
         string memory json = vm.readFile("addresses/480.json");
 
         address usdc = _findAddress(json, "USDC");

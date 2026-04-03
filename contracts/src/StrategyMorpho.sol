@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {IERC4626} from "@openzeppelin-4/contracts/interfaces/IERC4626.sol";
 import {IMerklClaimer} from "./interfaces/IMerklClaimer.sol";
-import "./BaseAllToNativeFactoryStrat.sol";
+import {BaseAllToNativeFactoryStrat, SafeERC20, IERC20, IFeeConfig} from "./BaseAllToNativeFactoryStrat.sol";
 
 contract StrategyMorpho is BaseAllToNativeFactoryStrat {
     using SafeERC20 for IERC20;

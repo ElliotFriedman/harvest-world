@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "./interfaces/IFeeConfig.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {IFeeConfig} from "./interfaces/IFeeConfig.sol";
 
 contract StratFeeManagerInitializable is OwnableUpgradeable, PausableUpgradeable {
     struct CommonAddresses {
@@ -38,6 +38,7 @@ contract StratFeeManagerInitializable is OwnableUpgradeable, PausableUpgradeable
     event SetBeefyFeeRecipient(address beefyFeeRecipient);
     event SetBeefyFeeConfig(address beefyFeeConfig);
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function __StratFeeManager_init(CommonAddresses calldata _commonAddresses) internal onlyInitializing {
         __Ownable_init();
         __Pausable_init();

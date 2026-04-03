@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import {IERC4626} from "@openzeppelin-4/contracts/interfaces/IERC4626.sol";
 import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
@@ -9,7 +9,6 @@ import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
 import {HarvestDeployer} from "../../script/deployers/HarvestDeployer.sol";
 import {BeefyVaultV7} from "../../src/BeefyVaultV7.sol";
 import {StrategyMorpho} from "../../src/StrategyMorpho.sol";
-import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
 
 import {MockStrategyFactory} from "../mocks/MockStrategyFactory.sol";
 import {MockFeeConfig} from "../mocks/MockFeeConfig.sol";
@@ -121,6 +120,8 @@ contract DepositForkTest is Test {
         deal(USDC, depositor, amount);
         vm.startPrank(depositor);
         IERC20(USDC).approve(address(PERMIT2), amount);
+        // casting to 'uint160' is safe because deposit amounts are bounded by real token supplies (< 2^160)
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.approve(USDC, address(vault), uint160(amount), uint48(block.timestamp + 1 days));
         vault.deposit(amount);
         vm.stopPrank();
@@ -158,6 +159,7 @@ contract DepositForkTest is Test {
 
         vm.startPrank(stranger);
         IERC20(USDC).approve(address(PERMIT2), 100e6);
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.approve(USDC, address(vault), uint160(100e6), uint48(block.timestamp + 1 days));
         vm.expectRevert("Harvest: humans only");
         vault.deposit(100e6);
@@ -225,6 +227,8 @@ contract DepositForkTest is Test {
 
         vm.startPrank(user);
         IERC20(USDC).approve(address(PERMIT2), amount);
+        // casting to 'uint160' is safe because deposit amounts are bounded by real token supplies (< 2^160)
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.approve(USDC, address(vault), uint160(amount), uint48(block.timestamp + 1 days));
         vault.depositAll();
         vm.stopPrank();

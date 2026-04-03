@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../../src/interfaces/IBeefySwapper.sol";
+import {IERC20} from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IBeefySwapper} from "../../src/interfaces/IBeefySwapper.sol";
 
 contract MockBeefySwapper is IBeefySwapper {
     using SafeERC20 for IERC20;

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "../base/BaseTest.sol";
+import {BaseTest} from "../base/BaseTest.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {StrategyMorpho} from "../../src/StrategyMorpho.sol";
 import {IStrategyV7} from "../../src/interfaces/IStrategyV7.sol";
-import {HarvestDeployer} from "../../script/deployers/HarvestDeployer.sol";
 
 contract BeefyVaultV7Test is BaseTest {
     // ── Initialization ────────────────────────────────────────────────────────
@@ -53,6 +52,8 @@ contract BeefyVaultV7Test is BaseTest {
         deal(address(want), user, amount);
         vm.startPrank(user);
         want.approve(PERMIT2_ADDR, amount);
+        // casting to 'uint160' is safe because test deposit amounts are bounded by real token supplies (< 2^160)
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.approve(address(want), address(vault), uint160(amount), uint48(block.timestamp + 1 days));
         vault.depositAll();
         vm.stopPrank();
@@ -65,6 +66,7 @@ contract BeefyVaultV7Test is BaseTest {
         deal(address(want), stranger, 100e6);
         vm.startPrank(stranger);
         want.approve(PERMIT2_ADDR, 100e6);
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.approve(address(want), address(vault), uint160(100e6), uint48(block.timestamp + 1 days));
         vm.expectRevert("Harvest: humans only");
         vault.deposit(100e6);
@@ -155,6 +157,7 @@ contract BeefyVaultV7Test is BaseTest {
 
         vm.startPrank(unverified);
         want.approve(PERMIT2_ADDR, 1000e6);
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.approve(address(want), address(vault), uint160(1000e6), uint48(block.timestamp + 1 days));
         vm.expectRevert("Harvest: humans only");
         vault.deposit(1000e6);

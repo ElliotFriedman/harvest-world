@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "../../src/interfaces/IFeeConfig.sol";
+import {IFeeConfig} from "../../src/interfaces/IFeeConfig.sol";
 
 contract MockFeeConfig is IFeeConfig {
     FeeCategory private _fees;

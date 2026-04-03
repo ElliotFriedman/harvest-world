@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @dev Minimal Permit2 mock implementing only the allowance-based API the vault uses.
 ///      Deploy at 0x000000000022D473030F116dDEE9F6B43aC78BA3 via vm.etch.

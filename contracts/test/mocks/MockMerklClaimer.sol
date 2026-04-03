@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "../../src/interfaces/IMerklClaimer.sol";
+import {IMerklClaimer} from "../../src/interfaces/IMerklClaimer.sol";
 
 contract MockMerklClaimer is IMerklClaimer {
     uint256 public claimCallCount;

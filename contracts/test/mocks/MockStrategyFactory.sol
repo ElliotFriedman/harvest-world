@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "../../src/interfaces/IStrategyFactory.sol";
+import {IStrategyFactory} from "../../src/interfaces/IStrategyFactory.sol";
 
 contract MockStrategyFactory is IStrategyFactory {
     address public override native;

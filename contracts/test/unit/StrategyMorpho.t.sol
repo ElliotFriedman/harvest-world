@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "../base/BaseTest.sol";
+import {BaseTest} from "../base/BaseTest.sol";
 import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
+import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockMerklClaimer} from "../mocks/MockMerklClaimer.sol";
 
 contract StrategyMorphoTest is BaseTest {
     // ── Initialization ────────────────────────────────────────────────────────
