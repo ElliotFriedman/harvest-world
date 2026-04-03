@@ -55,8 +55,12 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     error NotManager();
 
     modifier ifNotPaused() {
-        if (paused()) revert StrategyPaused();
+        _ifNotPaused();
         _;
+    }
+
+    function _ifNotPaused() internal view {
+        if (paused()) revert StrategyPaused();
     }
 
     modifier onlyManager() {
