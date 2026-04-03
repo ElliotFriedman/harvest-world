@@ -8,7 +8,6 @@ import {IStrategyV7} from "../../src/interfaces/IStrategyV7.sol";
 import {HarvestDeployer} from "../../script/deployers/HarvestDeployer.sol";
 
 contract BeefyVaultV7Test is BaseTest {
-
     // ── Initialization ────────────────────────────────────────────────────────
 
     function test_initialization() public view {

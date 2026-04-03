@@ -10,7 +10,7 @@ contract StrategyMorpho is BaseAllToNativeFactoryStrat {
 
     IERC4626 public morphoVault;
     IMerklClaimer public claimer;
-    uint public storedBalance;
+    uint256 public storedBalance;
 
     function initialize(
         address _morphoVault,
@@ -29,11 +29,11 @@ contract StrategyMorpho is BaseAllToNativeFactoryStrat {
         return "Morpho";
     }
 
-    function balanceOfPool() public view override returns (uint) {
+    function balanceOfPool() public view override returns (uint256) {
         return storedBalance;
     }
 
-    function _deposit(uint amount) internal override {
+    function _deposit(uint256 amount) internal override {
         IERC20(want).forceApprove(address(morphoVault), amount);
         // round down to the nearest amount of shares to mint for deposited assets
         uint256 shares = morphoVault.previewDeposit(amount);
@@ -43,7 +43,7 @@ contract StrategyMorpho is BaseAllToNativeFactoryStrat {
         storedBalance += morphoVault.previewRedeem(shares);
     }
 
-    function _withdraw(uint amount) internal override {
+    function _withdraw(uint256 amount) internal override {
         if (amount > 0) {
             // round up to the nearest amount of shares to withdraw for the requested amount
             uint256 requiredShares = morphoVault.previewWithdraw(amount);
@@ -55,7 +55,7 @@ contract StrategyMorpho is BaseAllToNativeFactoryStrat {
 
     function _emergencyWithdraw() internal override {
         storedBalance = 0;
-        uint bal = morphoVault.balanceOf(address(this));
+        uint256 bal = morphoVault.balanceOf(address(this));
         if (bal > 0) {
             morphoVault.redeem(bal, address(this), address(this));
         }
@@ -90,11 +90,7 @@ contract StrategyMorpho is BaseAllToNativeFactoryStrat {
     }
 
     /// @notice Claim rewards from the underlying platform
-    function claim(
-        address[] calldata _tokens,
-        uint256[] calldata _amounts,
-        bytes32[][] calldata _proofs
-    ) external {
+    function claim(address[] calldata _tokens, uint256[] calldata _amounts, bytes32[][] calldata _proofs) external {
         address[] memory users = new address[](1);
         users[0] = address(this);
 
@@ -106,7 +102,7 @@ contract StrategyMorpho is BaseAllToNativeFactoryStrat {
     }
 
     function setStoredBalance() external onlyOwner {
-        uint bal = morphoVault.balanceOf(address(this));
+        uint256 bal = morphoVault.balanceOf(address(this));
         storedBalance = morphoVault.previewRedeem(bal);
     }
 }

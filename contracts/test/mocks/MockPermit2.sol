@@ -12,10 +12,19 @@ contract MockPermit2 {
     // owner => token => spender => (amount, expiration)
     mapping(address => mapping(address => mapping(address => uint160))) public allowances;
 
-    event Approval(address indexed owner, address indexed token, address indexed spender, uint160 amount, uint48 expiration);
+    event Approval(
+        address indexed owner, address indexed token, address indexed spender, uint160 amount, uint48 expiration
+    );
 
     /// @notice Set spending allowance (called by the token owner directly).
-    function approve(address token, address spender, uint160 amount, uint48 /*expiration*/) external {
+    function approve(
+        address token,
+        address spender,
+        uint160 amount,
+        uint48 /*expiration*/
+    )
+        external
+    {
         allowances[msg.sender][token][spender] = amount;
         emit Approval(msg.sender, token, spender, amount, 0);
     }

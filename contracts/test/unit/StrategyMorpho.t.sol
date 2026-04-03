@@ -5,7 +5,6 @@ import "../base/BaseTest.sol";
 import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
 
 contract StrategyMorphoTest is BaseTest {
-
     // ── Initialization ────────────────────────────────────────────────────────
 
     function test_initialization() public view {

@@ -56,7 +56,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * @param _name the name of the vault token.
      * @param _symbol the symbol of the vault token.
      */
-     function initialize(
+    function initialize(
         IStrategyV7 _strategy,
         string memory _name,
         string memory _symbol,
@@ -78,7 +78,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * It takes into account the vault contract balance, the strategy contract balance
      *  and the balance deployed in other contracts as part of the strategy.
      */
-    function balance() public view returns (uint) {
+    function balance() public view returns (uint256) {
         return want().balanceOf(address(this)) + IStrategyV7(strategy).balanceOf();
     }
 
@@ -113,7 +113,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * Pulls tokens via Permit2 allowance-based transferFrom.
      * User must have approved this vault as a Permit2 spender beforehand.
      */
-    function deposit(uint _amount) public onlyHuman nonReentrant {
+    function deposit(uint256 _amount) public onlyHuman nonReentrant {
         strategy.beforeDeposit();
 
         uint256 _pool = balance();
@@ -129,7 +129,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * by the vault's deposit() function.
      */
     function earn() public {
-        uint _bal = available();
+        uint256 _bal = available();
         want().safeTransfer(address(strategy), _bal);
         strategy.deposit();
     }
@@ -150,12 +150,12 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
         uint256 r = (balance() * _shares) / totalSupply();
         _burn(msg.sender, _shares);
 
-        uint b = want().balanceOf(address(this));
+        uint256 b = want().balanceOf(address(this));
         if (b < r) {
-            uint _withdraw = r - b;
+            uint256 _withdraw = r - b;
             strategy.withdraw(_withdraw);
-            uint _after = want().balanceOf(address(this));
-            uint _diff = _after - b;
+            uint256 _after = want().balanceOf(address(this));
+            uint256 _diff = _after - b;
             if (_diff < _withdraw) {
                 r = b + _diff;
             }
@@ -169,20 +169,11 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * User calls this once with their IDKit proof, then can deposit freely.
      * Signal is msg.sender, so the proof is bound to the caller's address.
      */
-    function verifyHuman(
-        uint256 root,
-        uint256 nullifierHash,
-        uint256[8] calldata proof
-    ) external {
+    function verifyHuman(uint256 root, uint256 nullifierHash, uint256[8] calldata proof) external {
         if (nullifierHashes[nullifierHash]) revert InvalidNullifier();
 
         WORLD_ID_ROUTER.verifyProof(
-            root,
-            GROUP_ID,
-            _hashToField(abi.encodePacked(msg.sender)),
-            nullifierHash,
-            externalNullifierHash,
-            proof
+            root, GROUP_ID, _hashToField(abi.encodePacked(msg.sender)), nullifierHash, externalNullifierHash, proof
         );
 
         nullifierHashes[nullifierHash] = true;

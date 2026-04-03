@@ -64,10 +64,21 @@ contract MockMorphoVault is ERC20, IERC4626 {
         return convertToAssets(shares);
     }
 
-    function maxDeposit(address) external pure override returns (uint256) { return type(uint256).max; }
-    function maxMint(address) external pure override returns (uint256) { return type(uint256).max; }
-    function maxWithdraw(address owner_) external view override returns (uint256) { return convertToAssets(balanceOf(owner_)); }
-    function maxRedeem(address owner_) external view override returns (uint256) { return balanceOf(owner_); }
+    function maxDeposit(address) external pure override returns (uint256) {
+        return type(uint256).max;
+    }
+
+    function maxMint(address) external pure override returns (uint256) {
+        return type(uint256).max;
+    }
+
+    function maxWithdraw(address owner_) external view override returns (uint256) {
+        return convertToAssets(balanceOf(owner_));
+    }
+
+    function maxRedeem(address owner_) external view override returns (uint256) {
+        return balanceOf(owner_);
+    }
 
     // ── IERC4626 mutating ────────────────────────────────────────────────────
 

@@ -11,12 +11,7 @@ contract MockStrategyFactory is IStrategyFactory {
     bool public override globalPause;
     mapping(string => bool) private _strategyPause;
 
-    constructor(
-        address _native,
-        address _keeper,
-        address _beefyFeeRecipient,
-        address _beefyFeeConfig
-    ) {
+    constructor(address _native, address _keeper, address _beefyFeeRecipient, address _beefyFeeConfig) {
         native = _native;
         keeper = _keeper;
         beefyFeeRecipient = _beefyFeeRecipient;
@@ -32,11 +27,23 @@ contract MockStrategyFactory is IStrategyFactory {
     }
 
     // Test helpers
-    function setGlobalPause(bool _paused) external { globalPause = _paused; }
+    function setGlobalPause(bool _paused) external {
+        globalPause = _paused;
+    }
+
     function setStrategyPause(string calldata stratName, bool _paused) external {
         _strategyPause[stratName] = _paused;
     }
-    function setKeeper(address _keeper) external { keeper = _keeper; }
-    function setBeefyFeeRecipient(address _recipient) external { beefyFeeRecipient = _recipient; }
-    function setBeefyFeeConfig(address _config) external { beefyFeeConfig = _config; }
+
+    function setKeeper(address _keeper) external {
+        keeper = _keeper;
+    }
+
+    function setBeefyFeeRecipient(address _recipient) external {
+        beefyFeeRecipient = _recipient;
+    }
+
+    function setBeefyFeeConfig(address _config) external {
+        beefyFeeConfig = _config;
+    }
 }

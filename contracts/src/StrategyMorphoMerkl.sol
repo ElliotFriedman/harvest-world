@@ -28,23 +28,23 @@ contract StrategyMorphoMerkl is BaseAllToNativeFactoryStrat {
         return "MorphoMerkl";
     }
 
-    function balanceOfPool() public view override returns (uint) {
+    function balanceOfPool() public view override returns (uint256) {
         return morphoVault.convertToAssets(morphoVault.balanceOf(address(this)));
     }
 
-    function _deposit(uint amount) internal override {
+    function _deposit(uint256 amount) internal override {
         IERC20(want).forceApprove(address(morphoVault), amount);
         morphoVault.deposit(amount, address(this));
     }
 
-    function _withdraw(uint amount) internal override {
+    function _withdraw(uint256 amount) internal override {
         if (amount > 0) {
             morphoVault.withdraw(amount, address(this), address(this));
         }
     }
 
     function _emergencyWithdraw() internal override {
-        uint bal = morphoVault.balanceOf(address(this));
+        uint256 bal = morphoVault.balanceOf(address(this));
         if (bal > 0) {
             morphoVault.redeem(bal, address(this), address(this));
         }
@@ -62,11 +62,7 @@ contract StrategyMorphoMerkl is BaseAllToNativeFactoryStrat {
     }
 
     /// @notice Claim rewards from the underlying platform
-    function claim(
-        address[] calldata _tokens,
-        uint256[] calldata _amounts,
-        bytes32[][] calldata _proofs
-    ) external { 
+    function claim(address[] calldata _tokens, uint256[] calldata _amounts, bytes32[][] calldata _proofs) external {
         address[] memory users = new address[](1);
         users[0] = address(this);
 

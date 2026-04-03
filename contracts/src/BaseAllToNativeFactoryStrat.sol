@@ -23,7 +23,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     }
 
     address[] public rewards;
-    mapping(address => uint) public minAmounts; // tokens minimum amount to be swapped
+    mapping(address => uint256) public minAmounts; // tokens minimum amount to be swapped
 
     IStrategyFactory public factory;
     address public vault;
@@ -75,7 +75,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         strategist = _addresses.strategist;
         native = factory.native();
 
-        for (uint i; i < _rewards.length; i++) {
+        for (uint256 i; i < _rewards.length; i++) {
             addReward(_rewards[i]);
         }
         setDepositToken(_addresses.depositToken);
@@ -85,11 +85,11 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
 
     function stratName() public view virtual returns (string memory);
 
-    function balanceOfPool() public view virtual returns (uint);
+    function balanceOfPool() public view virtual returns (uint256);
 
-    function _deposit(uint amount) internal virtual;
+    function _deposit(uint256 amount) internal virtual;
 
-    function _withdraw(uint amount) internal virtual;
+    function _withdraw(uint256 amount) internal virtual;
 
     function _emergencyWithdraw() internal virtual;
 
@@ -146,7 +146,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
 
     // compounds earnings and charges performance fee
     function _harvest(address callFeeRecipient, bool onDeposit) internal ifNotPaused {
-        uint beforeBal = balanceOfWant();
+        uint256 beforeBal = balanceOfWant();
         _claim();
         _swapRewardsToNative();
         uint256 nativeBal = IERC20(native).balanceOf(address(this));
@@ -167,12 +167,12 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     }
 
     function _swapRewardsToNative() internal virtual {
-        for (uint i; i < rewards.length; ++i) {
+        for (uint256 i; i < rewards.length; ++i) {
             address token = rewards[i];
             if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
                 IWrappedNative(native).deposit{value: address(this).balance}();
             } else {
-                uint amount = IERC20(token).balanceOf(address(this));
+                uint256 amount = IERC20(token).balanceOf(address(this));
                 if (amount > minAmounts[token]) {
                     _swap(token, native, amount);
                 }
@@ -209,18 +209,18 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     }
 
     function _swap(address tokenFrom, address tokenTo) internal {
-        uint bal = IERC20(tokenFrom).balanceOf(address(this));
+        uint256 bal = IERC20(tokenFrom).balanceOf(address(this));
         _swap(tokenFrom, tokenTo, bal);
     }
 
-    function _swap(address tokenFrom, address tokenTo, uint amount) internal {
+    function _swap(address tokenFrom, address tokenTo, uint256 amount) internal {
         if (amount > 0 && tokenFrom != tokenTo) {
             IERC20(tokenFrom).forceApprove(swapper, amount);
             IBeefySwapper(swapper).swap(tokenFrom, tokenTo, amount);
         }
     }
 
-    function rewardsLength() external view returns (uint) {
+    function rewardsLength() external view returns (uint256) {
         return rewards.length;
     }
 
@@ -231,7 +231,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         rewards.push(_token);
     }
 
-    function removeReward(uint i) external onlyManager {
+    function removeReward(uint256 i) external onlyManager {
         rewards[i] = rewards[rewards.length - 1];
         rewards.pop();
     }
@@ -240,7 +240,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         delete rewards;
     }
 
-    function setRewardMinAmount(address token, uint minAmount) external onlyManager {
+    function setRewardMinAmount(address token, uint256 minAmount) external onlyManager {
         minAmounts[token] = minAmount;
     }
 
@@ -280,23 +280,23 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         }
     }
 
-    function setLockDuration(uint _duration) external onlyManager {
+    function setLockDuration(uint256 _duration) external onlyManager {
         lockDuration = _duration;
     }
 
-    function rewardsAvailable() external view virtual returns (uint) {
+    function rewardsAvailable() external view virtual returns (uint256) {
         return 0;
     }
 
-    function callReward() external view virtual returns (uint) {
+    function callReward() external view virtual returns (uint256) {
         return 0;
     }
 
-    function depositFee() public view virtual returns (uint) {
+    function depositFee() public view virtual returns (uint256) {
         return 0;
     }
 
-    function withdrawFee() public view virtual returns (uint) {
+    function withdrawFee() public view virtual returns (uint256) {
         return 0;
     }
 
@@ -354,7 +354,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         emit SetStrategist(_strategist);
     }
 
-    receive () payable external {}
+    receive() external payable {}
 
     uint256[49] private __gap;
 }

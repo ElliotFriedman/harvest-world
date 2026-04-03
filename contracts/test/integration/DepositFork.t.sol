@@ -23,13 +23,12 @@ import {MockBeefySwapper} from "../mocks/MockBeefySwapper.sol";
 ///         WORLD_CHAIN_RPC_URL=<url> forge test --match-contract DepositForkTest -vvv
 contract DepositForkTest is Test {
     // ── World Chain mainnet addresses ─────────────────────────────────────────
-    address internal constant USDC        = 0x79A02482A880bCE3F13e09Da970dC34db4CD24d1;
-    address internal constant WETH        = 0x4200000000000000000000000000000000000006;
+    address internal constant USDC = 0x79A02482A880bCE3F13e09Da970dC34db4CD24d1;
+    address internal constant WETH = 0x4200000000000000000000000000000000000006;
     address internal constant MORPHO_RE7_USDC_VAULT = 0xb1E80387EbE53Ff75a89736097D34dC8D9E9045B;
-    address internal constant MERKL_DISTRIBUTOR     = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
+    address internal constant MERKL_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
     address internal constant MORPHO_TOKEN = 0xe2108e43dBD43c9Dc6E494F86c4C4D938Bd10f56;
-    IAllowanceTransfer internal constant PERMIT2 =
-        IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    IAllowanceTransfer internal constant PERMIT2 = IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
     // ── Deployed system ───────────────────────────────────────────────────────
     BeefyVaultV7 internal vault;
@@ -56,10 +55,7 @@ contract DepositForkTest is Test {
     uint256 internal worldChainFork;
 
     function setUp() public {
-        string memory rpcUrl = vm.envOr(
-            "WORLD_CHAIN_RPC_URL",
-            string("https://worldchain.drpc.org")
-        );
+        string memory rpcUrl = vm.envOr("WORLD_CHAIN_RPC_URL", string("https://worldchain.drpc.org"));
 
         // Pin to a recent block so all tests in a run share the same cached state.
         // Update this periodically or remove the pin to test against latest.
@@ -67,11 +63,11 @@ contract DepositForkTest is Test {
         worldChainFork = vm.createFork(rpcUrl, forkBlock);
         vm.selectFork(worldChainFork);
 
-        owner            = makeAddr("owner");
-        keeper           = makeAddr("keeper");
-        strategist       = makeAddr("strategist");
+        owner = makeAddr("owner");
+        keeper = makeAddr("keeper");
+        strategist = makeAddr("strategist");
         beefyFeeRecipient = makeAddr("beefyFeeRecipient");
-        user             = makeAddr("user");
+        user = makeAddr("user");
 
         _deployInfrastructure();
         _deploySystem();
@@ -83,9 +79,9 @@ contract DepositForkTest is Test {
     // ── Infrastructure ────────────────────────────────────────────────────────
 
     function _deployInfrastructure() internal {
-        feeConfig        = new MockFeeConfig();
-        strategyFactory  = new MockStrategyFactory(WETH, keeper, beefyFeeRecipient, address(feeConfig));
-        swapper          = new MockBeefySwapper();
+        feeConfig = new MockFeeConfig();
+        strategyFactory = new MockStrategyFactory(WETH, keeper, beefyFeeRecipient, address(feeConfig));
+        swapper = new MockBeefySwapper();
     }
 
     function _deploySystem() internal {
@@ -93,20 +89,20 @@ contract DepositForkTest is Test {
         rewards[0] = MORPHO_TOKEN;
 
         HarvestDeployer.ExternalAddresses memory ext = HarvestDeployer.ExternalAddresses({
-            want:            USDC,
-            depositToken:    address(0),
-            morphoVault:     MORPHO_RE7_USDC_VAULT,
-            claimer:         MERKL_DISTRIBUTOR,
+            want: USDC,
+            depositToken: address(0),
+            morphoVault: MORPHO_RE7_USDC_VAULT,
+            claimer: MERKL_DISTRIBUTOR,
             strategyFactory: address(strategyFactory),
-            swapper:         address(swapper),
-            strategist:      strategist
+            swapper: address(swapper),
+            strategist: strategist
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
-            vaultName:        "Moo World Morpho USDC",
-            vaultSymbol:      "mooWorldMorphoUSDC",
+            vaultName: "Moo World Morpho USDC",
+            vaultSymbol: "mooWorldMorphoUSDC",
             harvestOnDeposit: false,
-            rewards:          rewards,
+            rewards: rewards,
             externalNullifierHash: 1 // test placeholder
         });
 
@@ -114,7 +110,7 @@ contract DepositForkTest is Test {
         HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);
         vm.stopPrank();
 
-        vault    = d.vault;
+        vault = d.vault;
         strategy = d.strategy;
     }
 

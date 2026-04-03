@@ -17,27 +17,28 @@ contract MockBeefySwapper is IBeefySwapper {
         rates[from][to] = rate;
     }
 
-    function swap(address fromToken, address toToken, uint256 amountIn)
-        external override returns (uint256 amountOut)
-    {
+    function swap(address fromToken, address toToken, uint256 amountIn) external override returns (uint256 amountOut) {
         return _doSwap(fromToken, toToken, amountIn);
     }
 
     function swap(address fromToken, address toToken, uint256 amountIn, uint256)
-        external override returns (uint256 amountOut)
+        external
+        override
+        returns (uint256 amountOut)
     {
         return _doSwap(fromToken, toToken, amountIn);
     }
 
-    function getAmountOut(address fromToken, address toToken, uint256 amountIn)
-        public view override returns (uint256)
-    {
+    function getAmountOut(address fromToken, address toToken, uint256 amountIn) public view override returns (uint256) {
         uint256 rate = rates[fromToken][toToken];
         if (rate == 0) return amountIn; // 1:1 fallback
         return amountIn * rate / 1e18;
     }
 
-    function swapInfo(address, address) external pure override
+    function swapInfo(address, address)
+        external
+        pure
+        override
         returns (address router, bytes calldata data, uint256 amountIndex, uint256 minIndex, int8 minAmountSign)
     {
         // calldata returns cannot be assigned in pure functions; return empty via assembly
@@ -51,9 +52,7 @@ contract MockBeefySwapper is IBeefySwapper {
         }
     }
 
-    function _doSwap(address fromToken, address toToken, uint256 amountIn)
-        internal returns (uint256 amountOut)
-    {
+    function _doSwap(address fromToken, address toToken, uint256 amountIn) internal returns (uint256 amountOut) {
         swapCallCount++;
         IERC20(fromToken).safeTransferFrom(msg.sender, address(this), amountIn);
         amountOut = getAmountOut(fromToken, toToken, amountIn);

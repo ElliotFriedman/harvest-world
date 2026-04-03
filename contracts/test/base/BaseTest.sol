@@ -25,9 +25,9 @@ abstract contract BaseTest is Test {
     StrategyMorpho internal strategy;
 
     // Mocks
-    MockERC20 internal want;         // USDC — 6 decimals
-    MockERC20 internal native;       // WETH — 18 decimals
-    MockERC20 internal rewardToken;  // MORPHO — 18 decimals
+    MockERC20 internal want; // USDC — 6 decimals
+    MockERC20 internal native; // WETH — 18 decimals
+    MockERC20 internal rewardToken; // MORPHO — 18 decimals
     MockMorphoVault internal morphoVault;
     MockStrategyFactory internal strategyFactory;
     MockBeefySwapper internal swapper;
@@ -64,22 +64,12 @@ abstract contract BaseTest is Test {
 
         feeConfig = new MockFeeConfig();
 
-        strategyFactory = new MockStrategyFactory(
-            address(native),
-            keeper,
-            beefyFeeRecipient,
-            address(feeConfig)
-        );
+        strategyFactory = new MockStrategyFactory(address(native), keeper, beefyFeeRecipient, address(feeConfig));
 
         swapper = new MockBeefySwapper();
         claimer = new MockMerklClaimer();
 
-        morphoVault = new MockMorphoVault(
-            address(want),
-            "Morpho USDC Vault",
-            "mUSDC",
-            6
-        );
+        morphoVault = new MockMorphoVault(address(want), "Morpho USDC Vault", "mUSDC", 6);
     }
 
     /// @dev Deploy MockPermit2 at the hardcoded address the vault uses.
