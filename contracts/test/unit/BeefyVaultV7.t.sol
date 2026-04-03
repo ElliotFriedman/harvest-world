@@ -169,6 +169,26 @@ contract BeefyVaultV7Test is BaseTest {
         assertGt(vault.balanceOf(verified), 0);
     }
 
+    function test_registered_agent_can_deposit() public {
+        address agent = makeAddr("agent");
+        agentBook.setRegistered(agent, true);
+        _depositAs(agent, 1000e6);
+        assertGt(vault.balanceOf(agent), 0);
+    }
+
+    function test_unregistered_agent_cannot_deposit() public {
+        address agent = makeAddr("agent");
+        // agentBook returns 0 by default — not registered
+        deal(address(want), agent, 1000e6);
+        vm.startPrank(agent);
+        want.approve(PERMIT2_ADDR, 1000e6);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        PERMIT2.approve(address(want), address(vault), uint160(1000e6), uint48(block.timestamp + 1 days));
+        vm.expectRevert("Harvest: humans only");
+        vault.deposit(1000e6);
+        vm.stopPrank();
+    }
+
     // ── Strategy management ───────────────────────────────────────────────────
 
     function test_setStrategy_owner_can_swap() public {
