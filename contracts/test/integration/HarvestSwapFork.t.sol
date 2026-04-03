@@ -80,9 +80,9 @@ contract HarvestSwapForkTest is Test {
             tokenOut,
             fee,
             address(swapper), // recipient
-            uint256(0),       // amountIn placeholder (overwritten at index 132)
-            uint256(0),       // amountOutMinimum placeholder (overwritten at index 164)
-            uint160(0)        // sqrtPriceLimitX96 — no limit
+            uint256(0), // amountIn placeholder (overwritten at index 132)
+            uint256(0), // amountOutMinimum placeholder (overwritten at index 164)
+            uint160(0) // sqrtPriceLimitX96 — no limit
         );
 
         swapper.setSwapInfo(
@@ -92,7 +92,7 @@ contract HarvestSwapForkTest is Test {
                 router: UNISWAP_V3_ROUTER,
                 data: data,
                 amountIndex: 132, // 4 + 4*32
-                minIndex: 164,    // 4 + 5*32
+                minIndex: 164, // 4 + 5*32
                 minAmountSign: 0
             })
         );
@@ -166,11 +166,7 @@ contract HarvestSwapForkTest is Test {
         assertEq(IERC20(WLD).balanceOf(address(strategy)), 0, "WLD not fully swapped");
 
         // 5. Verify: WETH was consumed (intermediate step completed)
-        assertEq(
-            IERC20(WETH).balanceOf(address(strategy)),
-            0,
-            "WETH left over - native to want swap incomplete"
-        );
+        assertEq(IERC20(WETH).balanceOf(address(strategy)), 0, "WETH left over - native to want swap incomplete");
 
         // 6. Verify: Morpho shares increased (funds redeposited)
         uint256 morphoSharesAfter = IERC4626(MORPHO_RE7_USDC_VAULT).balanceOf(address(strategy));

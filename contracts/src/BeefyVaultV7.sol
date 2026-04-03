@@ -3,7 +3,10 @@
 pragma solidity 0.8.28;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {SafeERC20Upgradeable, IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {
+    SafeERC20Upgradeable,
+    IERC20Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
@@ -53,10 +56,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     }
 
     function _onlyHuman() private view {
-        require(
-            verifiedHumans[msg.sender] || AGENT_BOOK.lookupHuman(msg.sender) != 0,
-            "Harvest: humans only"
-        );
+        require(verifiedHumans[msg.sender] || AGENT_BOOK.lookupHuman(msg.sender) != 0, "Harvest: humans only");
     }
 
     /**

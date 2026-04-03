@@ -188,7 +188,11 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     }
 
     // 5% performance fee sent to feeRecipient
-    function _chargeFees(address /*callFeeRecipient*/) internal {
+    function _chargeFees(
+        address /*callFeeRecipient*/
+    )
+        internal
+    {
         uint256 nativeBal = IERC20(NATIVE).balanceOf(address(this));
         uint256 feeAmount = nativeBal * HARVEST_FEE / DIVISOR;
         if (feeAmount > 0) {
