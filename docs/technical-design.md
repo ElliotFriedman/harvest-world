@@ -975,6 +975,44 @@ export async function waitForTransaction(
 }
 ```
 
+### 3.5 Blockchain Reads (viem Public Client)
+
+**Key constraint:** MiniKit only handles write operations (`sendTransaction`, `sign`, `pay`). There is no injected provider and no chain read capability. The app must bring its own read path.
+
+**Solution:** A viem public client on the frontend. Chain reads contain no secrets, so client-side is fine.
+
+```typescript
+// src/lib/viem-client.ts
+import { createPublicClient, http, defineChain } from "viem";
+
+export const worldchain = defineChain({
+  id: 480,
+  name: "World Chain",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://worldchain.drpc.org"] },
+  },
+  blockExplorers: {
+    default: { name: "Worldscan", url: "https://worldscan.org" },
+  },
+});
+
+export const publicClient = createPublicClient({
+  chain: worldchain,
+  transport: http(),
+});
+```
+
+**Deployed contract addresses to read from:**
+
+| Contract | Address | Key reads |
+|----------|---------|-----------|
+| Vault | `0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD` | `balanceOf(user)`, `getPricePerFullShare()`, `totalSupply()`, `balance()` |
+| Strategy | `0xd2753e1Ce625A776A4d73f0251419Ba5Dfc1c0A5` | `balanceOf()` (assets held in strategy) |
+| USDC | `0x79A02482A880bCE3F13e09Da970dC34db4CD24d1` | `balanceOf(user)` (wallet balance before deposit) |
+
+These reads power the `portfolio` and `vaults` terminal commands. See section 5.1 for the multicall implementation.
+
 ---
 
 ## 4. AGENT / HARVESTER
