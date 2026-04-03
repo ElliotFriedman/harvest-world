@@ -53,9 +53,9 @@ jobs:
         run: |
           forge script script/Deploy.s.sol \
             --rpc-url https://worldchain-mainnet.g.alchemy.com/public \
+            --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
             -vvv
         env:
-          PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
           APP_ID: "app_test"
 
   integration:

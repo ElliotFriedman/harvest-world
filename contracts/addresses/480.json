@@ -73,5 +73,20 @@
         "addr": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
         "name": "ENTRY_POINT_V07",
         "isContract": true
+    },
+    {
+        "addr": "0xe770BD40b6976Efbbb095174395DD2cb794c938a",
+        "name": "BEEFY_SWAPPER",
+        "isContract": true
+    },
+    {
+        "addr": "0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD",
+        "name": "HARVEST_VAULT",
+        "isContract": true
+    },
+    {
+        "addr": "0xd2753e1Ce625A776A4d73f0251419Ba5Dfc1c0A5",
+        "name": "HARVEST_STRATEGY",
+        "isContract": true
     }
 ]

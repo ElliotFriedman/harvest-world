@@ -50,8 +50,6 @@ contract Deploy is Script {
         address wld = _findAddress(json, "WLD");
         address uniV3Router = _findAddress(json, "UNISWAP_V3_SWAP_ROUTER_02");
 
-        address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
-
         // Compute World ID external nullifier hash from APP_ID env var
         string memory appId = vm.envString("APP_ID");
         uint256 externalNullifierHash = _computeExternalNullifierHash(appId);
@@ -60,8 +58,7 @@ contract Deploy is Script {
         address[] memory rewards = new address[](1);
         rewards[0] = wld;
 
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
-        vm.startBroadcast(deployerKey);
+        vm.startBroadcast();
 
         // ── 1. Deploy BeefySwapper ──────────────────────────────────────────
         // No oracle needed — strategy always calls swap(from, to, amount, 0)
@@ -90,8 +87,8 @@ contract Deploy is Script {
             morphoVault: morphoVaultAddr,
             claimer: merklDistributor,
             swapper: address(swapper),
-            strategist: deployer,
-            feeRecipient: deployer
+            strategist: msg.sender,
+            feeRecipient: msg.sender
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({

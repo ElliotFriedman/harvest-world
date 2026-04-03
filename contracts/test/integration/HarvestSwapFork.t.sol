@@ -13,7 +13,7 @@ import {BeefySwapper} from "../../src/BeefySwapper.sol";
 import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
 
 /// @notice Fork tests that exercise the REAL BeefySwapper + Uniswap V3 on World Chain.
-///         Proves the swap routing configured in Deploy.s.sol actually works end-to-end.
+///         Uses deployed contracts from 480.json if available, otherwise deploys fresh.
 ///
 ///         Run with:
 ///         WORLD_CHAIN_RPC_URL=<url> forge test --match-contract HarvestSwapForkTest -vvv
@@ -26,6 +26,11 @@ contract HarvestSwapForkTest is Test {
     address internal constant MERKL_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
     address internal constant UNISWAP_V3_ROUTER = 0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6;
     IAllowanceTransfer internal constant PERMIT2 = IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+
+    // ── Deployed Harvest contracts (from 480.json) ───────────────────────────
+    address internal constant DEPLOYED_VAULT = 0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD;
+    address payable internal constant DEPLOYED_STRATEGY = payable(0xd2753e1Ce625A776A4d73f0251419Ba5Dfc1c0A5);
+    address internal constant DEPLOYED_SWAPPER = 0xe770BD40b6976Efbbb095174395DD2cb794c938a;
 
     /// @dev SwapRouter02 exactInputSingle selector — must match Deploy.s.sol
     bytes4 internal constant EXACT_INPUT_SINGLE = 0x04e45aaf;
@@ -43,36 +48,38 @@ contract HarvestSwapForkTest is Test {
 
     function setUp() public {
         string memory rpcUrl = vm.envOr("WORLD_CHAIN_RPC_URL", string("https://worldchain.drpc.org"));
-        uint256 forkBlock = vm.envOr("WORLD_CHAIN_FORK_BLOCK", uint256(27956180));
-        worldChainFork = vm.createFork(rpcUrl, forkBlock);
+        worldChainFork = vm.createFork(rpcUrl);
         vm.selectFork(worldChainFork);
 
-        owner = makeAddr("owner");
         user = makeAddr("user");
 
-        vm.startPrank(owner);
-        _deploySwapper();
-        _deploySystem();
-        vm.stopPrank();
+        // Use deployed contracts if they exist on-chain, otherwise deploy fresh
+        if (DEPLOYED_VAULT.code.length > 0) {
+            vault = BeefyVaultV7(DEPLOYED_VAULT);
+            strategy = StrategyMorphoMerkl(DEPLOYED_STRATEGY);
+            swapper = BeefySwapper(DEPLOYED_SWAPPER);
+            owner = vault.owner();
+        } else {
+            owner = makeAddr("owner");
+            vm.startPrank(owner);
+            _deploySwapper();
+            _deploySystem();
+            vm.stopPrank();
+        }
 
         _setVerifiedInTest(user, true);
     }
 
-    // ── Setup helpers ─────────────────────────────────────────────────────────
+    // ── Setup helpers (used only when deploying fresh) ────────────────────────
 
-    /// @dev Deploy real BeefySwapper with Uniswap V3 routes that have on-chain liquidity.
-    ///      MORPHO has NO Uni V3 pools on World Chain. Merkl rewards are WLD.
     function _deploySwapper() internal {
         swapper = new BeefySwapper();
         swapper.initialize(address(0), 0);
 
-        // WLD -> WETH (0.3% fee) — pool 0x494D68e... has liquidity
         _setUniV3Route(WLD, WETH, 3000);
-        // WETH -> USDC (0.05% fee) — pool 0x5f8354... has liquidity
         _setUniV3Route(WETH, USDC, 500);
     }
 
-    /// @dev Mirrors Deploy.s.sol _setUniV3Route exactly.
     function _setUniV3Route(address tokenIn, address tokenOut, uint24 fee) internal {
         bytes memory data = abi.encodeWithSelector(
             EXACT_INPUT_SINGLE,
