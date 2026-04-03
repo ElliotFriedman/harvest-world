@@ -1,4 +1,6 @@
 .env
-signing-key.json
+.env.local
+app/.env.local
 
+signing-key.json
 app/node_modules/
