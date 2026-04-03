@@ -3,7 +3,9 @@
 pragma solidity 0.8.28;
 
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {
+    IERC20MetadataUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {IBeefyOracle} from "./interfaces/IBeefyOracle.sol";
@@ -47,11 +49,7 @@ contract BeefySwapper is OwnableUpgradeable {
     uint256 public slippage;
 
     event Swap(
-        address indexed caller,
-        address indexed fromToken,
-        address indexed toToken,
-        uint256 amountIn,
-        uint256 amountOut
+        address indexed caller, address indexed fromToken, address indexed toToken, uint256 amountIn, uint256 amountOut
     );
 
     event SetSwapInfo(address indexed fromToken, address indexed toToken, SwapInfo swapInfo);
@@ -65,43 +63,35 @@ contract BeefySwapper is OwnableUpgradeable {
     }
 
     /// @notice Swap between two tokens with slippage calculated using the oracle
-    function swap(
-        address _fromToken,
-        address _toToken,
-        uint256 _amountIn
-    ) external returns (uint256 amountOut) {
+    function swap(address _fromToken, address _toToken, uint256 _amountIn) external returns (uint256 amountOut) {
         uint256 minAmountOut = _getAmountOut(_fromToken, _toToken, _amountIn);
         amountOut = _swap(_fromToken, _toToken, _amountIn, minAmountOut);
     }
 
     /// @notice Swap between two tokens with caller-provided slippage (no oracle needed)
-    function swap(
-        address _fromToken,
-        address _toToken,
-        uint256 _amountIn,
-        uint256 _minAmountOut
-    ) external returns (uint256 amountOut) {
+    function swap(address _fromToken, address _toToken, uint256 _amountIn, uint256 _minAmountOut)
+        external
+        returns (uint256 amountOut)
+    {
         amountOut = _swap(_fromToken, _toToken, _amountIn, _minAmountOut);
     }
 
     /// @notice Get the estimated amount out (requires oracle)
-    function getAmountOut(
-        address _fromToken,
-        address _toToken,
-        uint256 _amountIn
-    ) external view returns (uint256 amountOut) {
-        (uint256 fromPrice, uint256 toPrice) =
-            (oracle.getPrice(_fromToken), oracle.getPrice(_toToken));
+    function getAmountOut(address _fromToken, address _toToken, uint256 _amountIn)
+        external
+        view
+        returns (uint256 amountOut)
+    {
+        (uint256 fromPrice, uint256 toPrice) = (oracle.getPrice(_fromToken), oracle.getPrice(_toToken));
         uint8 decimals0 = IERC20MetadataUpgradeable(_fromToken).decimals();
         uint8 decimals1 = IERC20MetadataUpgradeable(_toToken).decimals();
         amountOut = _calculateAmountOut(_amountIn, fromPrice, toPrice, decimals0, decimals1);
     }
 
-    function _getAmountOut(
-        address _fromToken,
-        address _toToken,
-        uint256 _amountIn
-    ) private returns (uint256 amountOut) {
+    function _getAmountOut(address _fromToken, address _toToken, uint256 _amountIn)
+        private
+        returns (uint256 amountOut)
+    {
         (uint256 fromPrice, uint256 toPrice) = _getFreshPrice(_fromToken, _toToken);
         uint8 decimals0 = IERC20MetadataUpgradeable(_fromToken).decimals();
         uint8 decimals1 = IERC20MetadataUpgradeable(_toToken).decimals();
@@ -109,12 +99,10 @@ contract BeefySwapper is OwnableUpgradeable {
         amountOut = _calculateAmountOut(slippedAmountIn, fromPrice, toPrice, decimals0, decimals1);
     }
 
-    function _swap(
-        address _fromToken,
-        address _toToken,
-        uint256 _amountIn,
-        uint256 _minAmountOut
-    ) private returns (uint256 amountOut) {
+    function _swap(address _fromToken, address _toToken, uint256 _amountIn, uint256 _minAmountOut)
+        private
+        returns (uint256 amountOut)
+    {
         IERC20MetadataUpgradeable(_fromToken).safeTransferFrom(msg.sender, address(this), _amountIn);
         _executeSwap(_fromToken, _toToken, _amountIn, _minAmountOut);
         amountOut = IERC20MetadataUpgradeable(_toToken).balanceOf(address(this));
@@ -123,12 +111,7 @@ contract BeefySwapper is OwnableUpgradeable {
         emit Swap(msg.sender, _fromToken, _toToken, _amountIn, amountOut);
     }
 
-    function _executeSwap(
-        address _fromToken,
-        address _toToken,
-        uint256 _amountIn,
-        uint256 _minAmountOut
-    ) private {
+    function _executeSwap(address _fromToken, address _toToken, uint256 _amountIn, uint256 _minAmountOut) private {
         SwapInfo memory swapData = swapInfo[_fromToken][_toToken];
         address router = swapData.router;
         if (router == address(0)) revert NoSwapData(_fromToken, _toToken);
@@ -149,24 +132,17 @@ contract BeefySwapper is OwnableUpgradeable {
         if (!success) revert SwapFailed(router, data);
     }
 
-    function _insertData(
-        bytes memory _data,
-        uint256 _index,
-        bytes memory _newData
-    ) private pure returns (bytes memory data) {
+    function _insertData(bytes memory _data, uint256 _index, bytes memory _newData)
+        private
+        pure
+        returns (bytes memory data)
+    {
         data = bytes.concat(
-            bytes.concat(
-                _data.slice(0, _index),
-                _newData
-            ),
-            _data.slice(_index + 32, _data.length - (_index + 32))
+            bytes.concat(_data.slice(0, _index), _newData), _data.slice(_index + 32, _data.length - (_index + 32))
         );
     }
 
-    function _getFreshPrice(
-        address _fromToken,
-        address _toToken
-    ) private returns (uint256 fromPrice, uint256 toPrice) {
+    function _getFreshPrice(address _fromToken, address _toToken) private returns (uint256 fromPrice, uint256 toPrice) {
         bool success;
         (fromPrice, success) = oracle.getFreshPrice(_fromToken);
         if (!success) revert PriceFailed(_fromToken);
@@ -184,25 +160,22 @@ contract BeefySwapper is OwnableUpgradeable {
         amountOut = _amountIn * (_price0 * 10 ** _decimals1) / (_price1 * 10 ** _decimals0);
     }
 
-    function setSwapInfo(
-        address _fromToken,
-        address _toToken,
-        SwapInfo calldata _swapInfo
-    ) external onlyOwner {
+    function setSwapInfo(address _fromToken, address _toToken, SwapInfo calldata _swapInfo) external onlyOwner {
         swapInfo[_fromToken][_toToken] = _swapInfo;
         emit SetSwapInfo(_fromToken, _toToken, _swapInfo);
     }
 
-    function setSwapInfos(
-        address[] calldata _fromTokens,
-        address[] calldata _toTokens,
-        SwapInfo[] calldata _swapInfos
-    ) external onlyOwner {
+    function setSwapInfos(address[] calldata _fromTokens, address[] calldata _toTokens, SwapInfo[] calldata _swapInfos)
+        external
+        onlyOwner
+    {
         uint256 tokenLength = _fromTokens.length;
-        for (uint i; i < tokenLength;) {
+        for (uint256 i; i < tokenLength;) {
             swapInfo[_fromTokens[i]][_toTokens[i]] = _swapInfos[i];
             emit SetSwapInfo(_fromTokens[i], _toTokens[i], _swapInfos[i]);
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 

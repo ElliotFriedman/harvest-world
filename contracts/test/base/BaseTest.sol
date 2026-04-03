@@ -30,9 +30,9 @@ abstract contract BaseTest is Test {
 
     // Mocks
     MockAgentBook internal agentBook; // etched at AGENT_BOOK_ADDR
-    MockERC20 internal want;          // USDC — 6 decimals
-    MockERC20 internal native;       // WETH — 18 decimals, etched to NATIVE_ADDR
-    MockERC20 internal rewardToken;  // MORPHO — 18 decimals
+    MockERC20 internal want; // USDC — 6 decimals
+    MockERC20 internal native; // WETH — 18 decimals, etched to NATIVE_ADDR
+    MockERC20 internal rewardToken; // MORPHO — 18 decimals
     MockMorphoVault internal morphoVault;
     MockBeefySwapper internal swapper;
     MockMerklClaimer internal claimer;

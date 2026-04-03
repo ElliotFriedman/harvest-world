@@ -29,6 +29,16 @@ contract Deploy is Script {
         revert(string.concat("Address not found: ", name));
     }
 
+    /// @dev World ID action name — must match the action created in the Developer Portal.
+    string internal constant WORLD_ID_ACTION = "verify-human";
+
+    /// @dev Compute the World ID external nullifier hash from app_id + action.
+    ///      Formula: hashToField(abi.encodePacked(hashToField(abi.encodePacked(app_id)), action))
+    function _computeExternalNullifierHash(string memory appId) internal pure returns (uint256) {
+        uint256 appIdHash = uint256(keccak256(abi.encodePacked(appId))) >> 8;
+        return uint256(keccak256(abi.encodePacked(appIdHash, WORLD_ID_ACTION))) >> 8;
+    }
+
     function run() external {
         // forge-lint: disable-next-line(unsafe-cheatcode)
         string memory json = vm.readFile("addresses/480.json");
@@ -41,6 +51,11 @@ contract Deploy is Script {
         address uniV3Router = _findAddress(json, "UNISWAP_V3_SWAP_ROUTER_02");
 
         address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
+
+        // Compute World ID external nullifier hash from APP_ID env var
+        string memory appId = vm.envString("APP_ID");
+        uint256 externalNullifierHash = _computeExternalNullifierHash(appId);
+        console.log("ExternalNullifier:", externalNullifierHash);
 
         address[] memory rewards = new address[](1);
         rewards[0] = wld;
@@ -84,7 +99,7 @@ contract Deploy is Script {
             vaultSymbol: "mooWorldMorphoUSDC",
             harvestOnDeposit: true,
             rewards: rewards,
-            externalNullifierHash: vm.envUint("WORLD_ID_EXTERNAL_NULLIFIER_HASH")
+            externalNullifierHash: externalNullifierHash
         });
 
         HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);
@@ -97,13 +112,9 @@ contract Deploy is Script {
     }
 
     /// @dev Register a Uniswap V3 exactInputSingle route in the swapper.
-    function _setUniV3Route(
-        BeefySwapper swapper,
-        address router,
-        address tokenIn,
-        address tokenOut,
-        uint24 fee
-    ) internal {
+    function _setUniV3Route(BeefySwapper swapper, address router, address tokenIn, address tokenOut, uint24 fee)
+        internal
+    {
         bytes memory data = abi.encodeWithSelector(
             EXACT_INPUT_SINGLE,
             tokenIn,

@@ -8,16 +8,8 @@
  */
 pragma solidity >=0.8.0 <0.9.0;
 
-
 library BytesLib {
-    function concat(
-        bytes memory _preBytes,
-        bytes memory _postBytes
-    )
-    internal
-    pure
-    returns (bytes memory)
-    {
+    function concat(bytes memory _preBytes, bytes memory _postBytes) internal pure returns (bytes memory) {
         bytes memory tempBytes;
 
         assembly {
@@ -53,24 +45,13 @@ library BytesLib {
                 mstore(mc, mload(cc))
             }
 
-            mstore(0x40, and(
-            add(add(end, iszero(add(length, mload(_preBytes)))), 31),
-            not(31)
-            ))
+            mstore(0x40, and(add(add(end, iszero(add(length, mload(_preBytes)))), 31), not(31)))
         }
 
         return tempBytes;
     }
 
-    function slice(
-        bytes memory _bytes,
-        uint256 _start,
-        uint256 _length
-    )
-    internal
-    pure
-    returns (bytes memory)
-    {
+    function slice(bytes memory _bytes, uint256 _start, uint256 _length) internal pure returns (bytes memory) {
         require(_length + 31 >= _length, "slice_overflow");
         require(_bytes.length >= _start + _length, "slice_outOfBounds");
 
@@ -121,7 +102,7 @@ library BytesLib {
     }
 
     function toUint8(bytes memory _bytes, uint256 _start) internal pure returns (uint8) {
-        require(_bytes.length >= _start + 1 , "toUint8_outOfBounds");
+        require(_bytes.length >= _start + 1, "toUint8_outOfBounds");
         uint8 tempUint;
 
         assembly {
@@ -132,8 +113,8 @@ library BytesLib {
     }
 
     function toUint24(bytes memory _bytes, uint256 _start) internal pure returns (uint24) {
-        require(_start + 3 >= _start, 'toUint24_overflow');
-        require(_bytes.length >= _start + 3, 'toUint24_outOfBounds');
+        require(_start + 3 >= _start, "toUint24_overflow");
+        require(_bytes.length >= _start + 3, "toUint24_outOfBounds");
         uint24 tempUint;
 
         assembly {
