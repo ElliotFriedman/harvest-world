@@ -126,6 +126,7 @@ contract BeefyVaultV7Test is BaseTest {
 
         _simulateYield(1.1e18); // 10% yield in Morpho vault
 
+        vm.prank(owner);
         strategy.harvest();
 
         // Skip past the 1-day lock duration so profit is fully released
@@ -240,6 +241,22 @@ contract BeefyVaultV7Test is BaseTest {
         vm.prank(owner);
         vm.expectRevert("!token");
         vault.inCaseTokensGetStuck(address(want));
+    }
+
+    // ── balance() view ────────────────────────────────────────────────────────
+
+    function test_withdraw_reverts_for_unverified_user() public {
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert("Harvest: humans only");
+        vault.withdraw(0);
+    }
+
+    function test_withdrawAll_reverts_for_unverified_user() public {
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert("Harvest: humans only");
+        vault.withdrawAll();
     }
 
     // ── balance() view ────────────────────────────────────────────────────────

@@ -37,13 +37,13 @@ contract Deploy is Script {
         address weth = _findAddress(json, "WETH");
         address morphoVaultAddr = _findAddress(json, "MORPHO_RE7_USDC_VAULT");
         address merklDistributor = _findAddress(json, "MERKL_DISTRIBUTOR");
-        address morphoToken = _findAddress(json, "MORPHO_TOKEN");
+        address wld = _findAddress(json, "WLD");
         address uniV3Router = _findAddress(json, "UNISWAP_V3_SWAP_ROUTER_02");
 
         address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
 
         address[] memory rewards = new address[](1);
-        rewards[0] = morphoToken;
+        rewards[0] = wld;
 
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerKey);
@@ -65,8 +65,8 @@ contract Deploy is Script {
         //   [164:196] amountOutMinimum ← replaced at minIndex
         //   [196:228] sqrtPriceLimitX96 (0 = no limit)
 
-        _setUniV3Route(swapper, uniV3Router, morphoToken, weth, 3000); // 0.3%
-        _setUniV3Route(swapper, uniV3Router, weth, usdc, 500); // 0.05%
+        _setUniV3Route(swapper, uniV3Router, wld, weth, 3000); // 0.3% — WLD/WETH pool has liquidity
+        _setUniV3Route(swapper, uniV3Router, weth, usdc, 500); // 0.05% — WETH/USDC pool has liquidity
 
         // ── 3. Deploy vault + strategy ──────────────────────────────────────
         HarvestDeployer.ExternalAddresses memory ext = HarvestDeployer.ExternalAddresses({

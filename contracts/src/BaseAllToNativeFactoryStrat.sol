@@ -139,15 +139,15 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         }
     }
 
-    function claim() external virtual {
+    function claim() external virtual onlyManager {
         _claim();
     }
 
-    function harvest() external virtual {
+    function harvest() external virtual onlyManager {
         _harvest(tx.origin, false);
     }
 
-    function harvest(address callFeeRecipient) external virtual {
+    function harvest(address callFeeRecipient) external virtual onlyManager {
         _harvest(callFeeRecipient, false);
     }
 
