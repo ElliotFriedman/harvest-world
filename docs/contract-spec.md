@@ -207,51 +207,89 @@ const result = await MiniKit.sendTransaction({
 
 **Core thesis:** The vault cryptographically guarantees every depositor is a unique verified human. This is the on-chain enforcement of "DeFi, for humans." Two verification paths exist: World ID for direct human deposits, and AgentKit for human-backed agent deposits. Both paths converge on a single on-chain mapping.
 
-**Recommendation: Option A -- Off-chain verification, on-chain whitelist.**
+**Decision: Hybrid -- on-chain World ID verification for humans, owner whitelist for AgentKit agents.**
 
-**Why Option A over Option B:**
+Two verification paths, one mapping:
 
-| Criterion | Option A (Off-chain) | Option B (On-chain) |
-|-----------|---------------------|---------------------|
-| Gas cost per deposit | ~2,100 gas (SLOAD check) | ~200,000+ gas (proof verification) |
-| Complexity | Low -- one mapping, one setter | High -- WorldID contract integration, proof parsing |
-| Trust assumption | Trusted backend signer | Trustless | 
-| Hackathon speed | Fast to implement | Slow, error-prone |
-| Demo reliability | High | Medium (proof generation can fail) |
-| Prize judges | "World ID gates deposits" -- both options satisfy this | On-chain is more impressive but riskier |
+| Path | Mechanism | Trust | Gas (one-time) |
+|------|-----------|-------|----------------|
+| Human (World ID) | `verifyHuman()` calls `WorldIDRouter.verifyProof()` on-chain | Trustless | ~200k (once, then free deposits) |
+| Agent (AgentKit) | `setVerified()` called by owner after backend AgentKit check | Trusted owner | ~22k |
 
-**Option A wins for hackathon.** The backend verifies the World ID proof (or AgentKit challenge) via the respective APIs, then calls `vault.setVerified(userAddress, true)` from the owner wallet. The contract checks `verifiedHumans[msg.sender]` on deposit.
+**Why on-chain for humans:** Removes backend trust assumption. The contract verifies the ZK proof directly against the deployed `WorldIDRouter` on World Chain mainnet (`0x17B354dD2595411ff79041f930e491A4Df39A278`). More impressive for judges. Uses IDKit 4.0 with `allow_legacy_proofs: true` and `orbLegacy()` preset to produce v3-format proofs verifiable on-chain.
 
-**New code to add:**
+**Why owner whitelist for agents:** AgentKit agents don't have World ID proofs -- they prove human-backing through AgentKit's protocol. The backend verifies via AgentBook, then the owner calls `setVerified()`. This trust assumption is justified: the agent IS the owner's agent.
+
+**New code:**
 
 ```solidity
-// --- Verified Humans Gate (unified for World ID + AgentKit) ---
+import {IWorldID} from "./interfaces/IWorldID.sol";
 
-/// @notice Mapping of addresses verified as unique humans (or human-backed agents)
+// World ID on-chain verification (WorldIDRouter on World Chain mainnet)
+IWorldID public constant WORLD_ID_ROUTER = IWorldID(0x17B354dD2595411ff79041f930e491A4Df39A278);
+uint256 public constant GROUP_ID = 1; // Orb credentials only
+uint256 public externalNullifierHash; // set in initialize(), derived from app_id + action
+
+mapping(uint256 => bool) public nullifierHashes; // sybil resistance
 mapping(address => bool) public verifiedHumans;
 
-/// @notice Emitted when a user/agent is verified or unverified
 event HumanVerification(address indexed user, bool verified);
+error InvalidNullifier();
 
-/// @notice Modifier that gates deposits to verified humans only
 modifier onlyHuman() {
     require(verifiedHumans[msg.sender], "Harvest: humans only");
     _;
 }
 
-/// @notice Set the verification status for an address
-/// @dev Called by the backend/owner after:
-///      - World ID verification (human deposits via MiniKit), OR
-///      - AgentKit verification (agent deposits via x402 endpoint)
-/// @param user The user or agent address to verify
-/// @param status True to verify, false to revoke
+/// @notice Verify a human via World ID on-chain proof. Trustless.
+/// @dev User calls this once with their IDKit proof, then can deposit freely.
+///      Signal is msg.sender, so the proof is bound to the caller's address.
+function verifyHuman(
+    uint256 root,
+    uint256 nullifierHash,
+    uint256[8] calldata proof
+) external {
+    if (nullifierHashes[nullifierHash]) revert InvalidNullifier();
+
+    WORLD_ID_ROUTER.verifyProof(
+        root,
+        GROUP_ID,
+        _hashToField(abi.encodePacked(msg.sender)),
+        nullifierHash,
+        externalNullifierHash,
+        proof
+    );
+
+    nullifierHashes[nullifierHash] = true;
+    verifiedHumans[msg.sender] = true;
+    emit HumanVerification(msg.sender, true);
+}
+
+/// @notice Set verification for AgentKit-verified agents only.
 function setVerified(address user, bool status) external onlyOwner {
     verifiedHumans[user] = status;
     emit HumanVerification(user, status);
 }
+
+function _hashToField(bytes memory value) internal pure returns (uint256) {
+    return uint256(keccak256(abi.encodePacked(value))) >> 8;
+}
 ```
 
-**NOTE:** The previous `worldIdVerified` / `setWorldIdVerified` / `worldIdSigner` pattern is superseded by `verifiedHumans` / `setVerified`. The unified mapping covers both World ID and AgentKit verification paths. Only `onlyOwner` can call `setVerified` -- for hackathon, the deployer EOA is the owner. Post-hackathon, transfer ownership to a multisig.
+**IWorldID interface** (new file `src/interfaces/IWorldID.sol`):
+
+```solidity
+interface IWorldID {
+    function verifyProof(
+        uint256 root,
+        uint256 groupId,
+        uint256 signalHash,
+        uint256 nullifierHash,
+        uint256 externalNullifierHash,
+        uint256[8] calldata proof
+    ) external view;
+}
+```
 
 **Integration in initialize():**
 

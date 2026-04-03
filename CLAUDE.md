@@ -167,3 +167,98 @@ You are helping build a hackathon project. Speed matters more than perfection. W
 - The demo is 3 minutes: `vaults` → `deposit 50 usdc` → `portfolio` → `agent status` → `agent harvest and see notification of yield generated`
 
 OK, I like to add more scope, but don't let me increase the scope, only let me pare down the already existing scope.
+
+
+Integrate World ID into my project using IDKit.
+
+My app credentials are stored in environment variables:
+- WORLD_APP_ID (app_id from the Developer Portal)
+- WORLD_RP_ID (rp_id from the Developer Portal)
+- RP_SIGNING_KEY (signing key — must stay secret, backend only)
+
+## Worldcoin Integration Steps
+
+1. Install the IDKit SDK for my platform.
+
+2. Create a backend endpoint that generates RP signatures.
+   Signatures verify that proof requests come from my app.
+   Use `signRequest(action, signingKey)` which returns `{ sig, nonce, createdAt, expiresAt }`.
+   Never expose the signing key to the client.
+
+3. On the client, fetch the RP signature from my backend, then create an IDKit request with:
+   - `app_id`, `action`, and `rp_context` (containing `rp_id`, `nonce`, `created_at`, `expires_at`, `signature` from the RP signature)
+   - `allow_legacy_proofs: true`
+   - `.preset(orbLegacy())` for Orb verification
+   - Signal is optional — use it to bind context like a user ID or wallet address into the proof. The backend should enforce the same value.
+
+4. On success, send the IDKit result to my backend.
+   The backend should forward the payload as-is to: POST https://developer.world.org/api/v4/verify/{rp_id}
+   No field remapping is needed.
+
+## Reference
+- Full docs: https://docs.world.org/llms.txt
+
+## Worldcoin Prize Track
+
+About
+Use MiniKit to ship a Mini App in World App, IDKit to add World ID 4.0 verification anywhere, and AgentKit to power agentic workflows. Together, they let you build human only products
+Prizes
+🤖 Best use of Agent Kit ⸺ $8,000
+🥇
+1st place
+$4,000
+🥈
+2nd place
+$2,500
+🥉
+3rd place
+$1,500
+Apps that use AgentKit to ship agentic experiences where World ID improves safety, fairness, or trust.
+Qualification Requirements
+Submissions must integrate World's Agent Kit to meaningfully distinguish human-backed agents from bots or automated scripts.
+Submissions that only use World ID or MiniKit without the Agent Kit layer will not qualify for this specific track.
+
+Links and Resources
+Agent Kit Docs
+https://docs.world.org/agents/agent-kit/integrate
+↗
+👥 Best use of World ID 4.0 ⸺ $8,000
+🥇
+1st place
+$4,000
+🥈
+2nd place
+$2,500
+🥉
+3rd place
+$1,500
+Leverage the new World ID 4.0 building products that break without proof of human
+Qualification Requirements
+Uses World ID 4.0 as a real constraint (eligibility, uniqueness, fairness, reputation, rate limits).
+Proof validation is required and needs to occur in a web backend or smart contract.
+
+Links and Resources
+World ID Docs
+https://docs.world.org/world-id/overview
+↗
+📱 Best use of Minikit 2.0 ⸺ $4,000
+🥇
+1st place
+$2,000
+🥈
+2nd place
+$1,250
+🥉
+3rd place
+$750
+Mini apps that make World ID and World App work smoothly with the broader Ethereum/Solana ecosystems and common dev stacks.
+Qualification Requirements
+- Build a Mini App with MiniKit 2.0
+- Integrate any of the MiniKit SDK Commands.
+- If your Mini App uses on-chain activity, deploy your contracts to World Chain.
+- (If Mini App) your project must not be gambling or chance based.
+- Proof validation is required and needs to occur in a web backend or smart contract.
+
+Links and Resources
+Mini App Docs
+https://docs.world.org/mini-apps

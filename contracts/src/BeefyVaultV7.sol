@@ -6,6 +6,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
+import {IWorldID} from "./interfaces/IWorldID.sol";
 
 import "./interfaces/IStrategyV7.sol";
 
@@ -17,20 +19,33 @@ import "./interfaces/IStrategyV7.sol";
 contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    struct StratCandidate {
-        address implementation;
-        uint proposedTime;
-    }
-
-    // The last proposed strategy to switch to.
-    StratCandidate public stratCandidate;
     // The strategy currently in use by the vault.
     IStrategyV7 public strategy;
-    // The minimum time it has to pass before a strat candidate can be approved.
-    uint256 public approvalDelay;
 
-    event NewStratCandidate(address implementation);
-    event UpgradeStrat(address implementation);
+    // Permit2 for token transfers (World App pre-approves all tokens to this contract)
+    IAllowanceTransfer public constant PERMIT2 = IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+
+    // World ID on-chain verification (WorldIDRouter on World Chain mainnet)
+    IWorldID public constant WORLD_ID_ROUTER = IWorldID(0x17B354dD2595411ff79041f930e491A4Df39A278);
+    uint256 public constant GROUP_ID = 1; // Orb credentials only
+
+    // Derived from app_id + action, set in initialize()
+    uint256 public externalNullifierHash;
+
+    // Sybil resistance: each nullifier can only be used once
+    mapping(uint256 => bool) public nullifierHashes;
+
+    // Verified humans (World ID) and human-backed agents (AgentKit)
+    mapping(address => bool) public verifiedHumans;
+
+    event HumanVerification(address indexed user, bool verified);
+
+    error InvalidNullifier();
+
+    modifier onlyHuman() {
+        require(verifiedHumans[msg.sender], "Harvest: humans only");
+        _;
+    }
 
     /**
      * @dev Sets the value of {token} to the token that the vault will
@@ -40,19 +55,18 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * @param _strategy the address of the strategy.
      * @param _name the name of the vault token.
      * @param _symbol the symbol of the vault token.
-     * @param _approvalDelay the delay before a new strat can be approved.
      */
      function initialize(
         IStrategyV7 _strategy,
         string memory _name,
         string memory _symbol,
-        uint256 _approvalDelay
+        uint256 _externalNullifierHash
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Ownable_init();
         __ReentrancyGuard_init();
         strategy = _strategy;
-        approvalDelay = _approvalDelay;
+        externalNullifierHash = _externalNullifierHash;
     }
 
     function want() public view returns (IERC20Upgradeable) {
@@ -89,29 +103,25 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     /**
      * @dev A helper function to call deposit() with all the sender's funds.
      */
-    function depositAll() external {
+    function depositAll() external onlyHuman {
         deposit(want().balanceOf(msg.sender));
     }
 
     /**
      * @dev The entrypoint of funds into the system. People deposit with this function
      * into the vault. The vault is then in charge of sending funds into the strategy.
+     * Pulls tokens via Permit2 allowance-based transferFrom.
+     * User must have approved this vault as a Permit2 spender beforehand.
      */
-    function deposit(uint _amount) public nonReentrant {
+    function deposit(uint _amount) public onlyHuman nonReentrant {
         strategy.beforeDeposit();
 
         uint256 _pool = balance();
-        want().safeTransferFrom(msg.sender, address(this), _amount);
-        earn();
-        uint256 _after = balance();
-        _amount = _after - _pool; // Additional check for deflationary tokens
-        uint256 shares = 0;
-        if (totalSupply() == 0) {
-            shares = _amount;
-        } else {
-            shares = (_amount * totalSupply()) / _pool;
-        }
+        PERMIT2.transferFrom(msg.sender, address(this), uint160(_amount), address(want()));
+
+        uint256 shares = totalSupply() == 0 ? _amount : (_amount * totalSupply()) / _pool;
         _mint(msg.sender, shares);
+        earn();
     }
 
     /**
@@ -154,38 +164,42 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
         want().safeTransfer(msg.sender, r);
     }
 
-    /** 
-     * @dev Sets the candidate for the new strat to use with this vault.
-     * @param _implementation The address of the candidate strategy.  
+    /**
+     * @dev Verify a human via World ID on-chain proof. Trustless — no backend needed.
+     * User calls this once with their IDKit proof, then can deposit freely.
+     * Signal is msg.sender, so the proof is bound to the caller's address.
      */
-    function proposeStrat(address _implementation) public onlyOwner {
-        require(address(this) == IStrategyV7(_implementation).vault(), "Proposal not valid for this Vault");
-        require(want() == IStrategyV7(_implementation).want(), "Different want");
-        stratCandidate = StratCandidate({
-            implementation: _implementation,
-            proposedTime: block.timestamp
-         });
+    function verifyHuman(
+        uint256 root,
+        uint256 nullifierHash,
+        uint256[8] calldata proof
+    ) external {
+        if (nullifierHashes[nullifierHash]) revert InvalidNullifier();
 
-        emit NewStratCandidate(_implementation);
+        WORLD_ID_ROUTER.verifyProof(
+            root,
+            GROUP_ID,
+            _hashToField(abi.encodePacked(msg.sender)),
+            nullifierHash,
+            externalNullifierHash,
+            proof
+        );
+
+        nullifierHashes[nullifierHash] = true;
+        verifiedHumans[msg.sender] = true;
+        emit HumanVerification(msg.sender, true);
     }
 
-    /** 
-     * @dev It switches the active strat for the strat candidate. After upgrading, the 
-     * candidate implementation is set to the 0x00 address, and proposedTime to a time 
-     * happening in +100 years for safety. 
+    /**
+     * @dev Direct strategy setter. No timelock for hackathon.
      */
-
-    function upgradeStrat() public onlyOwner {
-        require(stratCandidate.implementation != address(0), "There is no candidate");
-        require(stratCandidate.proposedTime + approvalDelay < block.timestamp, "Delay has not passed");
-
-        emit UpgradeStrat(stratCandidate.implementation);
-
-        strategy.retireStrat();
-        strategy = IStrategyV7(stratCandidate.implementation);
-        stratCandidate.implementation = address(0);
-        stratCandidate.proposedTime = 5000000000;
-
+    function setStrategy(IStrategyV7 _strategy) external onlyOwner {
+        require(address(_strategy) != address(0), "!strategy");
+        require(_strategy.want() == want(), "!want");
+        if (address(strategy) != address(0)) {
+            strategy.retireStrat();
+        }
+        strategy = _strategy;
         earn();
     }
 
@@ -198,5 +212,13 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
 
         uint256 amount = IERC20Upgradeable(_token).balanceOf(address(this));
         IERC20Upgradeable(_token).safeTransfer(msg.sender, amount);
+    }
+
+    /**
+     * @dev Hash a value to a field element for World ID proof verification.
+     * Matches the ByteHasher.hashToField() from World ID contracts.
+     */
+    function _hashToField(bytes memory value) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(value))) >> 8;
     }
 }
