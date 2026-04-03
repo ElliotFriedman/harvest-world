@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- CRT Phosphor glow filter -->
+    <filter id="phosphorGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Stronger outer glow for bloom effect -->
+    <filter id="outerBloom" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="bigBlur"/>
+      <feColorMatrix in="bigBlur" type="matrix"
+        values="0 0 0 0 0
+                0 1 0 0 0
+                0 0 0 0 0
+                0 0 0 0.4 0" result="greenBlur"/>
+      <feMerge>
+        <feMergeNode in="greenBlur"/>
+      </feMerge>
+    </filter>
+    <!-- Scanline pattern -->
+    <pattern id="scanlines" patternUnits="userSpaceOnUse" width="512" height="4">
+      <rect width="512" height="2" fill="transparent"/>
+      <rect y="2" width="512" height="2" fill="#000000" opacity="0.08"/>
+    </pattern>
+    <!-- Vignette gradient -->
+    <radialGradient id="vignette" cx="50%" cy="50%" r="60%" fx="50%" fy="50%">
+      <stop offset="0%" stop-color="#0a0a0a" stop-opacity="0"/>
+      <stop offset="70%" stop-color="#0a0a0a" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.6"/>
+    </radialGradient>
+    <!-- Subtle inner screen glow -->
+    <radialGradient id="screenGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" stop-color="#001a00" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#0a0a0a" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#060606" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="80" ry="80" fill="#0a0a0a"/>
+
+  <!-- Subtle screen glow in center -->
+  <rect width="512" height="512" rx="80" ry="80" fill="url(#screenGlow)"/>
+
+  <!-- Scanline overlay -->
+  <rect width="512" height="512" rx="80" ry="80" fill="url(#scanlines)"/>
+
+  <!-- Bloom layer (behind text) -->
+  <text x="256" y="295" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="160" font-weight="700" fill="#00ff00" filter="url(#outerBloom)">&gt;_</text>
+
+  <!-- Main prompt text with phosphor glow -->
+  <text x="256" y="295" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="160" font-weight="700" fill="#00ff00" filter="url(#phosphorGlow)">&gt;_</text>
+
+  <!-- Vignette overlay -->
+  <rect width="512" height="512" rx="80" ry="80" fill="url(#vignette)"/>
+
+  <!-- Blinking cursor animation -->
+  <style>
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    .cursor-blink {
+      animation: blink 1.06s step-end infinite;
+    }
+  </style>
+
+  <!-- Cursor line (blinking overlay on the underscore position) -->
+  <rect class="cursor-blink" x="280" y="300" width="60" height="6" rx="1" fill="#00ff00" filter="url(#phosphorGlow)"/>
+</svg>
