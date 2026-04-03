@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {SafeERC20Upgradeable, IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
 import {IWorldID} from "./interfaces/IWorldID.sol";
 
-import "./interfaces/IStrategyV7.sol";
+import {IStrategyV7} from "./interfaces/IStrategyV7.sol";
 
 /**
  * @dev Implementation of a vault to deposit funds for yield optimizing.
@@ -43,8 +43,12 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     error InvalidNullifier();
 
     modifier onlyHuman() {
-        require(verifiedHumans[msg.sender], "Harvest: humans only");
+        _onlyHuman();
         _;
+    }
+
+    function _onlyHuman() private view {
+        require(verifiedHumans[msg.sender], "Harvest: humans only");
     }
 
     /**
@@ -117,6 +121,8 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
         strategy.beforeDeposit();
 
         uint256 _pool = balance();
+        // casting to 'uint160' is safe because deposit amounts are bounded by real token supplies (< 2^160)
+        // forge-lint: disable-next-line(unsafe-typecast)
         PERMIT2.transferFrom(msg.sender, address(this), uint160(_amount), address(want()));
 
         uint256 shares = totalSupply() == 0 ? _amount : (_amount * totalSupply()) / _pool;

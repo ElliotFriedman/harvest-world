@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin-5/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./interfaces/IBeefySwapper.sol";
-import "./interfaces/IStrategyFactory.sol";
-import "./interfaces/IFeeConfig.sol";
-import "./interfaces/IWrappedNative.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {SafeERC20, IERC20} from "@openzeppelin-5/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IBeefySwapper} from "./interfaces/IBeefySwapper.sol";
+import {IStrategyFactory} from "./interfaces/IStrategyFactory.sol";
+import {IFeeConfig} from "./interfaces/IFeeConfig.sol";
+import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 
 abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -52,8 +52,12 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     error NotManager();
 
     modifier ifNotPaused() {
-        if (paused() || factory.globalPause() || factory.strategyPause(stratName())) revert StrategyPaused();
+        _ifNotPaused();
         _;
+    }
+
+    function _ifNotPaused() private view {
+        if (paused() || factory.globalPause() || factory.strategyPause(stratName())) revert StrategyPaused();
     }
 
     modifier onlyManager() {
@@ -65,6 +69,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         if (msg.sender != owner() && msg.sender != keeper()) revert NotManager();
     }
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function __BaseStrategy_init(Addresses memory _addresses, address[] memory _rewards) internal onlyInitializing {
         __Ownable_init();
         __Pausable_init();
@@ -304,6 +309,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     function retireStrat() external {
         require(msg.sender == vault, "!vault");
         _emergencyWithdraw();
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(want).transfer(vault, balanceOfWant());
     }
 
@@ -356,5 +362,6 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
 
     receive() external payable {}
 
+    // forge-lint: disable-next-line(mixed-case-variable)
     uint256[49] private __gap;
 }

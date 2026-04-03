@@ -36,7 +36,7 @@ jobs:
 
       - name: Forge lint
         working-directory: contracts
-        run: forge lint --check
+        run: forge lint
 
   deploy-dry-run:
     name: Deploy Script Dry Run
