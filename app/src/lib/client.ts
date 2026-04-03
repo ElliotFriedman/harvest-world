@@ -4,12 +4,15 @@ import { createPublicClient, http, type Chain } from "viem";
 // Chain definition
 // ---------------------------------------------------------------------------
 
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://worldchain.drpc.org";
+
 export const worldChain: Chain = {
   id: 480,
   name: "World Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://worldchain.drpc.org"] },
+<<<<<<< HEAD
+    default: { http: [RPC_URL] },
   },
 };
 
@@ -19,7 +22,7 @@ export const worldChain: Chain = {
 
 export const publicClient = createPublicClient({
   chain: worldChain,
-  transport: http("https://worldchain.drpc.org"),
+  transport: http(RPC_URL),
 });
 
 // ---------------------------------------------------------------------------
