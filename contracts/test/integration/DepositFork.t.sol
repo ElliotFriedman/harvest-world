@@ -8,15 +8,12 @@ import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
 
 import {HarvestDeployer} from "../../script/deployers/HarvestDeployer.sol";
 import {BeefyVaultV7} from "../../src/BeefyVaultV7.sol";
-import {StrategyMorpho} from "../../src/StrategyMorpho.sol";
+import {StrategyMorphoMerkl} from "../../src/StrategyMorphoMerkl.sol";
 
-import {MockStrategyFactory} from "../mocks/MockStrategyFactory.sol";
-import {MockFeeConfig} from "../mocks/MockFeeConfig.sol";
 import {MockBeefySwapper} from "../mocks/MockBeefySwapper.sol";
 
 /// @notice Fork tests against World Chain mainnet (chainId 480).
 ///         Set WORLD_CHAIN_RPC_URL in the environment to run these.
-///         They are skipped automatically when the env var is absent.
 ///
 ///         Run with:
 ///         WORLD_CHAIN_RPC_URL=<url> forge test --match-contract DepositForkTest -vvv
@@ -31,18 +28,14 @@ contract DepositForkTest is Test {
 
     // ── Deployed system ───────────────────────────────────────────────────────
     BeefyVaultV7 internal vault;
-    StrategyMorpho internal strategy;
+    StrategyMorphoMerkl internal strategy;
 
-    // ── Beefy infra mocks (not yet deployed on World Chain) ───────────────────
-    MockStrategyFactory internal strategyFactory;
-    MockFeeConfig internal feeConfig;
     MockBeefySwapper internal swapper;
 
     // ── Actors ────────────────────────────────────────────────────────────────
     address internal owner;
-    address internal keeper;
     address internal strategist;
-    address internal beefyFeeRecipient;
+    address internal feeRecipient;
     address internal user;
 
     /// @dev Directly set verifiedHumans[_user] via vm.store (slot 204).
@@ -57,15 +50,13 @@ contract DepositForkTest is Test {
         string memory rpcUrl = vm.envOr("WORLD_CHAIN_RPC_URL", string("https://worldchain.drpc.org"));
 
         // Pin to a recent block so all tests in a run share the same cached state.
-        // Update this periodically or remove the pin to test against latest.
         uint256 forkBlock = vm.envOr("WORLD_CHAIN_FORK_BLOCK", uint256(27956180));
         worldChainFork = vm.createFork(rpcUrl, forkBlock);
         vm.selectFork(worldChainFork);
 
         owner = makeAddr("owner");
-        keeper = makeAddr("keeper");
         strategist = makeAddr("strategist");
-        beefyFeeRecipient = makeAddr("beefyFeeRecipient");
+        feeRecipient = makeAddr("feeRecipient");
         user = makeAddr("user");
 
         _deployInfrastructure();
@@ -78,8 +69,6 @@ contract DepositForkTest is Test {
     // ── Infrastructure ────────────────────────────────────────────────────────
 
     function _deployInfrastructure() internal {
-        feeConfig = new MockFeeConfig();
-        strategyFactory = new MockStrategyFactory(WETH, keeper, beefyFeeRecipient, address(feeConfig));
         swapper = new MockBeefySwapper();
     }
 
@@ -92,9 +81,9 @@ contract DepositForkTest is Test {
             depositToken: address(0),
             morphoVault: MORPHO_RE7_USDC_VAULT,
             claimer: MERKL_DISTRIBUTOR,
-            strategyFactory: address(strategyFactory),
             swapper: address(swapper),
-            strategist: strategist
+            strategist: strategist,
+            feeRecipient: feeRecipient
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
@@ -207,7 +196,6 @@ contract DepositForkTest is Test {
     /// @dev After deposit, price per share stays ~1e18 (no yield yet).
     function test_price_per_share_after_deposit() public {
         _depositAs(user, 1000e6);
-        // Price should remain very close to 1e18 immediately after deposit
         assertApproxEqRel(vault.getPricePerFullShare(), 1e18, 0.001e18, "price drifted >0.1%");
     }
 
@@ -216,7 +204,6 @@ contract DepositForkTest is Test {
         uint256 amount = 500e6;
         _depositAs(user, amount);
 
-        // vault.balance() = strategy.balanceOf() ≈ deposited amount
         assertApproxEqRel(vault.balance(), amount, 0.001e18, "vault balance off by >0.1%");
     }
 
@@ -237,12 +224,12 @@ contract DepositForkTest is Test {
         assertEq(IERC20(USDC).balanceOf(user), 0, "USDC balance not zero");
     }
 
-    /// @dev Deposit without Permit2 approval reverts (not merely returns 0).
+    /// @dev Deposit without Permit2 approval reverts.
     function test_deposit_reverts_without_permit2_approval() public {
         deal(USDC, user, 100e6);
 
         vm.prank(user);
-        vm.expectRevert(); // MockPermit2 or real Permit2 will revert
+        vm.expectRevert();
         vault.deposit(100e6);
     }
 }

@@ -74,7 +74,7 @@ contract StrategyMorpho is BaseAllToNativeFactoryStrat {
             uint256 redeemedAmount = morphoVault.previewRedeem(sharesToRedeem);
             if (redeemedAmount > minAmounts[want]) {
                 redeemedAmount = morphoVault.redeem(sharesToRedeem, address(this), address(this));
-                _swap(want, native, redeemedAmount);
+                _swap(want, NATIVE, redeemedAmount);
             }
         }
         super._swapRewardsToNative();

@@ -6,39 +6,37 @@ import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
 
 import {HarvestDeployer} from "../../script/deployers/HarvestDeployer.sol";
 import {BeefyVaultV7} from "../../src/BeefyVaultV7.sol";
-import {StrategyMorpho} from "../../src/StrategyMorpho.sol";
+import {StrategyMorphoMerkl} from "../../src/StrategyMorphoMerkl.sol";
 
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {MockStrategyFactory} from "../mocks/MockStrategyFactory.sol";
 import {MockBeefySwapper} from "../mocks/MockBeefySwapper.sol";
-import {MockFeeConfig} from "../mocks/MockFeeConfig.sol";
 import {MockMerklClaimer} from "../mocks/MockMerklClaimer.sol";
 import {MockMorphoVault} from "../mocks/MockMorphoVault.sol";
 import {MockPermit2} from "../mocks/MockPermit2.sol";
 
 abstract contract BaseTest is Test {
     address internal constant PERMIT2_ADDR = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+    // WETH on World Chain mainnet — hardcoded in BaseAllToNativeFactoryStrat.NATIVE
+    address internal constant NATIVE_ADDR = 0x4200000000000000000000000000000000000006;
+
     IAllowanceTransfer internal constant PERMIT2 = IAllowanceTransfer(PERMIT2_ADDR);
 
     // Deployed system
     BeefyVaultV7 internal vault;
-    StrategyMorpho internal strategy;
+    StrategyMorphoMerkl internal strategy;
 
     // Mocks
-    MockERC20 internal want; // USDC — 6 decimals
-    MockERC20 internal native; // WETH — 18 decimals
-    MockERC20 internal rewardToken; // MORPHO — 18 decimals
+    MockERC20 internal want;         // USDC — 6 decimals
+    MockERC20 internal native;       // WETH — 18 decimals, etched to NATIVE_ADDR
+    MockERC20 internal rewardToken;  // MORPHO — 18 decimals
     MockMorphoVault internal morphoVault;
-    MockStrategyFactory internal strategyFactory;
     MockBeefySwapper internal swapper;
-    MockFeeConfig internal feeConfig;
     MockMerklClaimer internal claimer;
 
     // Actors
     address internal owner;
-    address internal keeper;
     address internal strategist;
-    address internal beefyFeeRecipient;
+    address internal feeRecipient;
     address internal user;
 
     function setUp() public virtual {
@@ -51,20 +49,21 @@ abstract contract BaseTest is Test {
 
     function _createActors() internal virtual {
         owner = makeAddr("owner");
-        keeper = makeAddr("keeper");
         strategist = makeAddr("strategist");
-        beefyFeeRecipient = makeAddr("beefyFeeRecipient");
+        feeRecipient = makeAddr("feeRecipient");
         user = makeAddr("user");
     }
 
     function _deployMocks() internal virtual {
         want = new MockERC20("USD Coin", "USDC", 6);
-        native = new MockERC20("Wrapped Ether", "WETH", 18);
         rewardToken = new MockERC20("Morpho Token", "MORPHO", 18);
 
-        feeConfig = new MockFeeConfig();
-
-        strategyFactory = new MockStrategyFactory(address(native), keeper, beefyFeeRecipient, address(feeConfig));
+        // Deploy WETH mock at the hardcoded NATIVE address used by the strategy constant.
+        // vm.etch copies bytecode; vm.store sets the _decimals slot (slot 5 in MockERC20).
+        MockERC20 wethImpl = new MockERC20("Wrapped Ether", "WETH", 18);
+        vm.etch(NATIVE_ADDR, address(wethImpl).code);
+        vm.store(NATIVE_ADDR, bytes32(uint256(5)), bytes32(uint256(18)));
+        native = MockERC20(NATIVE_ADDR);
 
         swapper = new MockBeefySwapper();
         claimer = new MockMerklClaimer();
@@ -87,9 +86,9 @@ abstract contract BaseTest is Test {
             depositToken: address(0),
             morphoVault: address(morphoVault),
             claimer: address(claimer),
-            strategyFactory: address(strategyFactory),
             swapper: address(swapper),
-            strategist: strategist
+            strategist: strategist,
+            feeRecipient: feeRecipient
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
@@ -110,16 +109,12 @@ abstract contract BaseTest is Test {
     }
 
     function _postSetup() internal virtual {
-        // Set swap rates to handle decimal differences (want=6 dec, native=18 dec):
-        //   rewardToken (18 dec) → native (18 dec): 1:1
-        //   want (6 dec) → native (18 dec): 1e30, so round-trip ≈ identity
-        //   native (18 dec) → want (6 dec): 1e6, so (1e30 * 1e6 = 1e36 = 1e18 * 1e18 ✓)
-        swapper.setSwapRate(address(rewardToken), address(native), 1e18);
-        swapper.setSwapRate(address(want), address(native), 1e30);
-        swapper.setSwapRate(address(native), address(want), 1e6);
+        // Swap rates: rewardToken → WETH 1:1, WETH → USDC 1e6 (1 WETH = 1 USDC in tests)
+        swapper.setSwapRate(address(rewardToken), NATIVE_ADDR, 1e18);
+        swapper.setSwapRate(NATIVE_ADDR, address(want), 1e6);
 
-        // Pre-fund swapper with enough output tokens for any reasonable test swap
-        deal(address(native), address(swapper), 1_000 ether);
+        // Pre-fund swapper with output tokens
+        deal(NATIVE_ADDR, address(swapper), 1_000 ether);
         deal(address(want), address(swapper), 100_000e6);
 
         // Mark the test user as a verified human

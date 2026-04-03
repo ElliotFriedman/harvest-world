@@ -4,8 +4,6 @@ pragma solidity 0.8.28;
 import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {HarvestDeployer} from "./deployers/HarvestDeployer.sol";
-import {MockStrategyFactory} from "../test/mocks/MockStrategyFactory.sol";
-import {MockFeeConfig} from "../test/mocks/MockFeeConfig.sol";
 import {MockBeefySwapper} from "../test/mocks/MockBeefySwapper.sol";
 
 contract Deploy is Script {
@@ -33,7 +31,6 @@ contract Deploy is Script {
         string memory json = vm.readFile("addresses/480.json");
 
         address usdc = _findAddress(json, "USDC");
-        address weth = _findAddress(json, "WETH");
         address morphoVaultAddr = _findAddress(json, "MORPHO_RE7_USDC_VAULT");
         address merklDistributor = _findAddress(json, "MERKL_DISTRIBUTOR");
         address morphoToken = _findAddress(json, "MORPHO_TOKEN");
@@ -46,9 +43,7 @@ contract Deploy is Script {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerKey);
 
-        // Deploy lightweight infra (no StrategyFactory/Swapper on World Chain yet)
-        MockFeeConfig feeConfig = new MockFeeConfig();
-        MockStrategyFactory factory = new MockStrategyFactory(weth, deployer, deployer, address(feeConfig));
+        // MockBeefySwapper for hackathon — replace with real BeefySwapper + Uniswap V3 routes in production
         MockBeefySwapper swapper = new MockBeefySwapper();
 
         HarvestDeployer.ExternalAddresses memory ext = HarvestDeployer.ExternalAddresses({
@@ -56,9 +51,9 @@ contract Deploy is Script {
             depositToken: address(0),
             morphoVault: morphoVaultAddr,
             claimer: merklDistributor,
-            strategyFactory: address(factory),
             swapper: address(swapper),
-            strategist: deployer
+            strategist: deployer,
+            feeRecipient: deployer
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
@@ -73,8 +68,6 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        console.log("FeeConfig:        ", address(feeConfig));
-        console.log("StrategyFactory:  ", address(factory));
         console.log("BeefySwapper:     ", address(swapper));
         console.log("Vault:            ", address(d.vault));
         console.log("Strategy:         ", address(d.strategy));

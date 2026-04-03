@@ -8,6 +8,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
 import {IWorldID} from "./interfaces/IWorldID.sol";
+import {IAgentBook} from "./interfaces/IAgentBook.sol";
 
 import {IStrategyV7} from "./interfaces/IStrategyV7.sol";
 
@@ -29,6 +30,10 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     IWorldID public constant WORLD_ID_ROUTER = IWorldID(0x17B354dD2595411ff79041f930e491A4Df39A278);
     uint256 public constant GROUP_ID = 1; // Orb credentials only
 
+    // AgentBook registry — maps human-backed agent wallets → humanId (nullifierHash)
+    // Agents register via: npx @worldcoin/agentkit-cli register <wallet>
+    IAgentBook public constant AGENT_BOOK = IAgentBook(0xA23aB2712eA7BBa896930544C7d6636a96b944dA);
+
     // Derived from app_id + action, set in initialize()
     uint256 public externalNullifierHash;
 
@@ -48,7 +53,10 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     }
 
     function _onlyHuman() private view {
-        require(verifiedHumans[msg.sender], "Harvest: humans only");
+        require(
+            verifiedHumans[msg.sender] || AGENT_BOOK.lookupHuman(msg.sender) != 0,
+            "Harvest: humans only"
+        );
     }
 
     /**

@@ -6,7 +6,7 @@ import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {MockMerklClaimer} from "../mocks/MockMerklClaimer.sol";
 
-contract StrategyMorphoTest is BaseTest {
+contract StrategyMorphoMerklTest is BaseTest {
     // ── Initialization ────────────────────────────────────────────────────────
 
     function test_initialization() public view {
@@ -14,9 +14,10 @@ contract StrategyMorphoTest is BaseTest {
         assertEq(address(strategy.claimer()), address(claimer));
         assertEq(strategy.vault(), address(vault));
         assertEq(strategy.want(), address(want));
-        assertEq(strategy.native(), address(native));
+        assertEq(strategy.NATIVE(), NATIVE_ADDR);
         assertEq(strategy.swapper(), address(swapper));
         assertEq(strategy.strategist(), strategist);
+        assertEq(strategy.feeRecipient(), feeRecipient);
         assertFalse(strategy.paused());
         assertFalse(strategy.harvestOnDeposit());
     }
@@ -35,14 +36,6 @@ contract StrategyMorphoTest is BaseTest {
         assertEq(want.balanceOf(address(strategy)), 0);
     }
 
-    function test_deposit_updates_stored_balance() public {
-        uint256 amount = 1000e6;
-        _depositAs(user, amount);
-
-        // storedBalance should approximate the deposited amount (minus tiny dust)
-        assertApproxEqAbs(strategy.storedBalance(), amount, 2);
-    }
-
     function test_balance_of_matches_morpho_holdings() public {
         uint256 amount = 1000e6;
         _depositAs(user, amount);
@@ -56,7 +49,6 @@ contract StrategyMorphoTest is BaseTest {
         uint256 amount = 1000e6;
         _depositAs(user, amount);
 
-        // Simulate vault calling withdraw
         uint256 withdrawAmount = 500e6;
         vm.prank(address(vault));
         strategy.withdraw(withdrawAmount);
@@ -85,16 +77,15 @@ contract StrategyMorphoTest is BaseTest {
 
     // ── Harvest ───────────────────────────────────────────────────────────────
 
-    function test_harvest_charges_fees() public {
+    function test_harvest_charges_fees_to_fee_recipient() public {
         _depositAs(user, 1000e6);
-
         deal(address(rewardToken), address(strategy), 100 ether);
 
-        vm.prank(keeper);
         strategy.harvest();
 
         assertGt(strategy.lastHarvest(), 0);
-        assertGt(native.balanceOf(strategist), 0); // fees paid in native
+        // 5% fee in WETH sent to feeRecipient
+        assertGt(native.balanceOf(feeRecipient), 0);
     }
 
     function test_harvest_sets_last_harvest_timestamp() public {
@@ -102,8 +93,6 @@ contract StrategyMorphoTest is BaseTest {
         deal(address(rewardToken), address(strategy), 1 ether);
 
         skip(1 days);
-
-        vm.prank(keeper);
         strategy.harvest();
 
         assertEq(strategy.lastHarvest(), block.timestamp);
@@ -112,11 +101,10 @@ contract StrategyMorphoTest is BaseTest {
     function test_harvest_with_zero_rewards_does_nothing() public {
         _depositAs(user, 1000e6);
 
-        // No rewards — harvest should not revert, just skip fee charging
-        vm.prank(keeper);
+        // No rewards — harvest should not revert, just skip
         strategy.harvest();
 
-        // lastHarvest stays 0 since nativeBal <= minAmounts[native]
+        // lastHarvest stays 0 since nativeBal <= minAmounts[NATIVE]
         assertEq(strategy.lastHarvest(), 0);
     }
 
@@ -126,13 +114,9 @@ contract StrategyMorphoTest is BaseTest {
 
         uint256 tvlBefore = vault.balance();
 
-        // Simulate 5% yield in Morpho
         _simulateYield(1.05e18);
 
-        // StrategyMorpho._swapRewardsToNative extracts profit when exchange rate grows
-        // We need to call harvest to crystallize it
         skip(1 days);
-        vm.prank(keeper);
         strategy.harvest();
 
         // After harvest, lockDuration applies — wait for profit to unlock
@@ -147,7 +131,6 @@ contract StrategyMorphoTest is BaseTest {
         _depositAs(user, 1000e6);
         deal(address(rewardToken), address(strategy), 10 ether);
 
-        vm.prank(keeper);
         strategy.harvest();
 
         uint256 lockedImmediately = strategy.lockedProfit();
@@ -186,7 +169,7 @@ contract StrategyMorphoTest is BaseTest {
         vm.prank(owner);
         strategy.unpause();
         assertFalse(strategy.paused());
-        assertEq(strategy.balanceOfPool(), strategy.storedBalance());
+        assertGt(strategy.balanceOfPool(), 0);
     }
 
     function test_deposit_reverts_when_paused() public {
@@ -216,12 +199,13 @@ contract StrategyMorphoTest is BaseTest {
 
     // ── Access control ────────────────────────────────────────────────────────
 
-    function test_onlyManager_keeper_can_harvest() public {
+    function test_harvest_is_public() public {
         _depositAs(user, 1000e6);
         deal(address(rewardToken), address(strategy), 1 ether);
 
-        // keeper can harvest
-        vm.prank(keeper);
+        // Anyone can call harvest (incentivized by tx.origin receiving call fee in future)
+        address anyone = makeAddr("anyone");
+        vm.prank(anyone);
         strategy.harvest();
     }
 
@@ -252,24 +236,6 @@ contract StrategyMorphoTest is BaseTest {
         vm.prank(owner);
         vm.expectRevert("!vault");
         strategy.retireStrat();
-    }
-
-    // ── Global pause (factory-level) ──────────────────────────────────────────
-
-    function test_global_pause_blocks_deposit() public {
-        strategyFactory.setGlobalPause(true);
-
-        deal(address(want), address(strategy), 100e6);
-        vm.expectRevert(BaseAllToNativeFactoryStrat.StrategyPaused.selector);
-        strategy.deposit();
-    }
-
-    function test_strategy_pause_blocks_deposit() public {
-        strategyFactory.setStrategyPause("Morpho", true);
-
-        deal(address(want), address(strategy), 100e6);
-        vm.expectRevert(BaseAllToNativeFactoryStrat.StrategyPaused.selector);
-        strategy.deposit();
     }
 
     // ── Reward management ─────────────────────────────────────────────────────

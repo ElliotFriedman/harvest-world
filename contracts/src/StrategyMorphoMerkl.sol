@@ -68,4 +68,8 @@ contract StrategyMorphoMerkl is BaseAllToNativeFactoryStrat {
 
         claimer.claim(users, _tokens, _amounts, _proofs);
     }
+
+    function setClaimer(address _claimer) external onlyManager {
+        claimer = IMerklClaimer(_claimer);
+    }
 }

@@ -6,8 +6,6 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {SafeERC20, IERC20} from "@openzeppelin-5/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBeefySwapper} from "./interfaces/IBeefySwapper.sol";
-import {IStrategyFactory} from "./interfaces/IStrategyFactory.sol";
-import {IFeeConfig} from "./interfaces/IFeeConfig.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 
 abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpgradeable {
@@ -16,34 +14,39 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     struct Addresses {
         address want;
         address depositToken;
-        address factory;
         address vault;
         address swapper;
         address strategist;
+        address feeRecipient;
     }
+
+    // WETH on World Chain (chain ID 480)
+    address public constant NATIVE = 0x4200000000000000000000000000000000000006;
+
+    // 5% performance fee on harvested yield
+    uint256 public constant HARVEST_FEE = 0.05 ether;
+
+    uint256 constant DIVISOR = 1 ether;
 
     address[] public rewards;
     mapping(address => uint256) public minAmounts; // tokens minimum amount to be swapped
 
-    IStrategyFactory public factory;
     address public vault;
     address public swapper;
     address public strategist;
+    address public feeRecipient;
 
     address public want;
-    address public native;
     address public depositToken;
     uint256 public lastHarvest;
     uint256 public totalLocked;
     uint256 public lockDuration;
     bool public harvestOnDeposit;
 
-    uint256 constant DIVISOR = 1 ether;
-
     event StratHarvest(address indexed harvester, uint256 wantHarvested, uint256 tvl);
     event Deposit(uint256 tvl);
     event Withdraw(uint256 tvl);
-    event ChargedFees(uint256 callFees, uint256 beefyFees, uint256 strategistFees);
+    event ChargedFees(uint256 feeAmount);
     event SetVault(address vault);
     event SetSwapper(address swapper);
     event SetStrategist(address strategist);
@@ -57,7 +60,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     }
 
     function _ifNotPaused() private view {
-        if (paused() || factory.globalPause() || factory.strategyPause(stratName())) revert StrategyPaused();
+        if (paused()) revert StrategyPaused();
     }
 
     modifier onlyManager() {
@@ -66,7 +69,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
     }
 
     function _checkManager() internal view {
-        if (msg.sender != owner() && msg.sender != keeper()) revert NotManager();
+        if (msg.sender != owner()) revert NotManager();
     }
 
     // forge-lint: disable-next-line(mixed-case-function)
@@ -74,11 +77,10 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         __Ownable_init();
         __Pausable_init();
         want = _addresses.want;
-        factory = IStrategyFactory(_addresses.factory);
         vault = _addresses.vault;
         swapper = _addresses.swapper;
         strategist = _addresses.strategist;
-        native = factory.native();
+        feeRecipient = _addresses.feeRecipient;
 
         for (uint256 i; i < _rewards.length; i++) {
             addReward(_rewards[i]);
@@ -154,8 +156,8 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         uint256 beforeBal = balanceOfWant();
         _claim();
         _swapRewardsToNative();
-        uint256 nativeBal = IERC20(native).balanceOf(address(this));
-        if (nativeBal > minAmounts[native]) {
+        uint256 nativeBal = IERC20(NATIVE).balanceOf(address(this));
+        if (nativeBal > minAmounts[NATIVE]) {
             _chargeFees(callFeeRecipient);
 
             _swapNativeToWant();
@@ -175,39 +177,32 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         for (uint256 i; i < rewards.length; ++i) {
             address token = rewards[i];
             if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
-                IWrappedNative(native).deposit{value: address(this).balance}();
+                IWrappedNative(NATIVE).deposit{value: address(this).balance}();
             } else {
                 uint256 amount = IERC20(token).balanceOf(address(this));
                 if (amount > minAmounts[token]) {
-                    _swap(token, native, amount);
+                    _swap(token, NATIVE, amount);
                 }
             }
         }
     }
 
-    // performance fees
-    function _chargeFees(address callFeeRecipient) internal {
-        IFeeConfig.FeeCategory memory fees = beefyFeeConfig().getFees(address(this));
-        uint256 nativeBal = IERC20(native).balanceOf(address(this)) * fees.total / DIVISOR;
-
-        uint256 callFeeAmount = nativeBal * fees.call / DIVISOR;
-        IERC20(native).safeTransfer(callFeeRecipient, callFeeAmount);
-
-        uint256 beefyFeeAmount = nativeBal * fees.beefy / DIVISOR;
-        IERC20(native).safeTransfer(beefyFeeRecipient(), beefyFeeAmount);
-
-        uint256 strategistFeeAmount = nativeBal * fees.strategist / DIVISOR;
-        IERC20(native).safeTransfer(strategist, strategistFeeAmount);
-
-        emit ChargedFees(callFeeAmount, beefyFeeAmount, strategistFeeAmount);
+    // 5% performance fee sent to feeRecipient
+    function _chargeFees(address /*callFeeRecipient*/) internal {
+        uint256 nativeBal = IERC20(NATIVE).balanceOf(address(this));
+        uint256 feeAmount = nativeBal * HARVEST_FEE / DIVISOR;
+        if (feeAmount > 0) {
+            IERC20(NATIVE).safeTransfer(feeRecipient, feeAmount);
+            emit ChargedFees(feeAmount);
+        }
     }
 
     function _swapNativeToWant() internal virtual {
         if (depositToken == address(0)) {
-            _swap(native, want);
+            _swap(NATIVE, want);
         } else {
-            if (depositToken != native) {
-                _swap(native, depositToken);
+            if (depositToken != NATIVE) {
+                _swap(NATIVE, depositToken);
             }
             _swap(depositToken, want);
         }
@@ -218,10 +213,12 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         _swap(tokenFrom, tokenTo, bal);
     }
 
+    // Uses 4-arg swap (minAmountOut=0) so no oracle is needed.
+    // Acceptable for hackathon; add oracle-based slippage protection in production.
     function _swap(address tokenFrom, address tokenTo, uint256 amount) internal {
         if (amount > 0 && tokenFrom != tokenTo) {
             IERC20(tokenFrom).forceApprove(swapper, amount);
-            IBeefySwapper(swapper).swap(tokenFrom, tokenTo, amount);
+            IBeefySwapper(swapper).swap(tokenFrom, tokenTo, amount, 0);
         }
     }
 
@@ -231,7 +228,7 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
 
     function addReward(address _token) public onlyManager {
         require(_token != want, "!want");
-        require(_token != native, "!native");
+        require(_token != NATIVE, "!native");
         _verifyRewardToken(_token);
         rewards.push(_token);
     }
@@ -328,22 +325,6 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         deposit();
     }
 
-    function keeper() public view returns (address) {
-        return factory.keeper();
-    }
-
-    function beefyFeeConfig() public view returns (IFeeConfig) {
-        return IFeeConfig(factory.beefyFeeConfig());
-    }
-
-    function beefyFeeRecipient() public view returns (address) {
-        return factory.beefyFeeRecipient();
-    }
-
-    function getAllFees() external view returns (IFeeConfig.AllFees memory) {
-        return IFeeConfig.AllFees(beefyFeeConfig().getFees(address(this)), depositFee(), withdrawFee());
-    }
-
     function setVault(address _vault) external onlyOwner {
         vault = _vault;
         emit SetVault(_vault);
@@ -358,6 +339,10 @@ abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpg
         require(msg.sender == strategist, "!strategist");
         strategist = _strategist;
         emit SetStrategist(_strategist);
+    }
+
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+        feeRecipient = _feeRecipient;
     }
 
     receive() external payable {}
