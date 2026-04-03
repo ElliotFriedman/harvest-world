@@ -32,7 +32,7 @@ contract Deploy is Script {
         address usdc = _findAddress(json, "USDC");
         address morphoVaultAddr = _findAddress(json, "MORPHO_RE7_USDC_VAULT");
         address merklDistributor = _findAddress(json, "MERKL_DISTRIBUTOR");
-        address morphoToken = _findAddress(json, "MORPHO");
+        address morphoToken = _findAddress(json, "MORPHO_TOKEN");
 
         address strategyFactory = vm.envAddress("STRATEGY_FACTORY");
         address beefySwapper = vm.envAddress("BEEFY_SWAPPER");
