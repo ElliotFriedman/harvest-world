@@ -1,0 +1,75 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Build
+        working-directory: contracts
+        run: forge build
+
+      - name: Unit tests
+        working-directory: contracts
+        run: forge test --match-path "test/unit/*" -vvv
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Forge lint
+        working-directory: contracts
+        run: forge lint
+
+  deploy-dry-run:
+    name: Deploy Script Dry Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Simulate deployment
+        working-directory: contracts
+        run: |
+          forge script script/Deploy.s.sol \
+            --rpc-url https://worldchain-mainnet.g.alchemy.com/public \
+            -vvv
+        env:
+          PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+          WORLD_ID_EXTERNAL_NULLIFIER_HASH: "12345"
+
+  integration:
+    name: Fork Tests (World Chain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Fork tests
+        working-directory: contracts
+        run: forge test --match-path "test/integration/*" -vvv
+        env:
+          WORLD_CHAIN_RPC_URL: https://worldchain.drpc.org

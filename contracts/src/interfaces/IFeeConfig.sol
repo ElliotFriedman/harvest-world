@@ -11,6 +11,7 @@ interface IFeeConfig {
         string label;
         bool active;
     }
+
     struct AllFees {
         FeeCategory performance;
         uint256 deposit;

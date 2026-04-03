@@ -2,12 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "./interfaces/IFeeConfig.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {IFeeConfig} from "./interfaces/IFeeConfig.sol";
 
 contract StratFeeManagerInitializable is OwnableUpgradeable, PausableUpgradeable {
-
     struct CommonAddresses {
         address vault;
         address unirouter;
@@ -26,8 +25,8 @@ contract StratFeeManagerInitializable is OwnableUpgradeable, PausableUpgradeable
     IFeeConfig public beefyFeeConfig;
 
     uint256 constant DIVISOR = 1 ether;
-    uint256 constant public WITHDRAWAL_FEE_CAP = 50;
-    uint256 constant public WITHDRAWAL_MAX = 10000;
+    uint256 public constant WITHDRAWAL_FEE_CAP = 50;
+    uint256 public constant WITHDRAWAL_MAX = 10000;
     uint256 internal withdrawalFee;
 
     event SetStratFeeId(uint256 feeId);
@@ -39,6 +38,7 @@ contract StratFeeManagerInitializable is OwnableUpgradeable, PausableUpgradeable
     event SetBeefyFeeRecipient(address beefyFeeRecipient);
     event SetBeefyFeeConfig(address beefyFeeConfig);
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function __StratFeeManager_init(CommonAddresses calldata _commonAddresses) internal onlyInitializing {
         __Ownable_init();
         __Pausable_init();
@@ -124,11 +124,11 @@ contract StratFeeManagerInitializable is OwnableUpgradeable, PausableUpgradeable
         emit SetBeefyFeeConfig(_beefyFeeConfig);
     }
 
-    function depositFee() public virtual view returns (uint256) {
+    function depositFee() public view virtual returns (uint256) {
         return 0;
     }
 
-    function withdrawFee() public virtual view returns (uint256) {
+    function withdrawFee() public view virtual returns (uint256) {
         return paused() ? 0 : withdrawalFee;
     }
 
