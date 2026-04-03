@@ -50,7 +50,7 @@ When making changes to the product (scope, architecture, contracts, UI, demo), u
 5. **No swap routing in MVP** — users deposit the token the vault accepts (USDC). Swap routing is stretch.
 6. **USDC vault only for MVP** — WLD vault is stretch.
 7. **AgentKit gates agent deposits** — external agents must prove human-backing via AgentKit to deposit. The vault's x402-protected deposit endpoint verifies agents via AgentBook. This is genuine — protects against bot farming of vault yields and future airdrop rewards.
-8. **World ID gates human deposits** — only Orb-verified humans can deposit directly. Combined with AgentKit, every depositor (human or agent) traces back to a verified unique person.
+8. **World ID gates human deposits** — on-chain verification via `verifyHuman()`. Users submit their IDKit proof once; the vault calls `WORLD_ID_ROUTER.verifyProof()` directly (Group 1 = Orb only). Nullifiers are stored on-chain to prevent replay. No backend signer needed.
 9. **"DeFi, for humans"** — the core thesis. The vault cryptographically guarantees every depositor is a unique human. This protects rewards distribution, prevents sybil attacks, and makes the vault safe for future incentive programs.
 9. **Cron-based harvesting** — simple backend cron calls harvest() every 6-12 hours. Threshold-based (pendingRewards >= minHarvest).
 10. **No multisig for hackathon** — EOAs for deployer and agent wallets. Multisig is production concern.
@@ -79,6 +79,7 @@ When creating new issues, ALWAYS update the tracker issue (#22) checklist to inc
 | Uniswap V3 SwapRouter02 | `0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6` |
 | Uniswap V3 QuoterV2 | `0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c` |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+| World ID Router | `0x17B354dD2595411ff79041f930e491A4Df39A278` |
 | Safe L2 v1.4.1 | `0x29fcB43b46531BcA003ddC8FCB67FFE91900C762` |
 | EntryPoint v0.7 | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
 
@@ -97,8 +98,7 @@ Source: `github.com/beefyfinance/beefy-contracts` (MIT licensed)
 
 | File | Purpose | Modifications |
 |------|---------|---------------|
-| `vaults/BeefyVaultV7.sol` | User-facing vault, mints shares | Add World ID deposit gate |
-| `vaults/BeefyVaultV7Factory.sol` | EIP-1167 clone factory | Use as-is |
+| `vaults/BeefyVaultV7.sol` | User-facing vault, mints shares | Add World ID `verifyHuman()` + Permit2 deposit |
 | `strategies/Morpho/StrategyMorpho.sol` | Morpho yield + Merkl claiming | Configure for World Chain vaults |
 | `strategies/BaseAllToNativeFactoryStrat.sol` | Base harvest flow | Simplify fee structure |
 | `strategies/StrategyFactory.sol` | Beacon proxy factory | Use as-is |

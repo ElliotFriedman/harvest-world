@@ -104,7 +104,7 @@ The agent IS the product. AgentKit is not bolted on for prize eligibility — it
 
 ### D6: World ID Gates Deposits
 
-Only World ID-verified humans can deposit into vaults. This prevents sybil farming of vault yields and Merkl rewards. Verification happens once at session start and is stored as a hashed nullifier in the database.
+Only World ID-verified humans can deposit into vaults. This prevents sybil farming of vault yields and Merkl rewards. Users call `verifyHuman(root, nullifierHash, proof)` once with their IDKit proof; the vault verifies on-chain against the WorldID Router and stores the nullifier to prevent replay. No backend signer or database needed for this step.
 
 ### D7: Terminal-First Interface
 
@@ -197,23 +197,20 @@ The main entry point for users. Implements ERC-4626-like share accounting.
 **Modifications from Beefy upstream:**
 - Remove `owner()` governance functions (or set to deployer EOA)
 - Remove treasury fee split (set fees to 0 or hardcode minimal fee)
-- Add World ID verification modifier on `deposit()`:
+- Add `onlyHuman` modifier on `deposit()` and `depositAll()`:
   ```solidity
-  modifier onlyVerifiedHuman(address _user) {
-      require(worldIdVerified[_user], "!verified");
+  modifier onlyHuman() {
+      require(verifiedHumans[msg.sender], "Harvest: humans only");
       _;
   }
   ```
-- Add `setVerified(address _user, bool _status)` callable by the backend signer (verified off-chain via World ID proof, then whitelisted on-chain)
-- Alternatively: accept the World ID proof on-chain using the WorldID contract (more trustless, more gas)
+- Add `verifyHuman(uint256 root, uint256 nullifierHash, uint256[8] calldata proof)` — users call this once with their IDKit proof. The vault calls `WORLD_ID_ROUTER.verifyProof()` on-chain (Group 1 = Orb only). Nullifier is stored to prevent replay. Signal is `msg.sender`.
+- Add Permit2 deposit: `PERMIT2.transferFrom()` instead of `token.transferFrom()`.
+- Set `externalNullifierHash` at deploy time (derived from `app_id + action`).
 
-**Design decision on World ID enforcement:**
-
-Option A (recommended for hackathon): Off-chain verification, on-chain whitelist. The backend verifies the World ID proof, then calls `setVerified(user, true)` from a trusted signer. Simpler, cheaper gas.
-
-Option B (stretch): On-chain verification. The vault calls the World ID contract directly to verify the proof in the deposit transaction. More trustless but more complex and more gas.
-
-Go with Option A for the hackathon.
+**World ID contracts on World Chain:**
+- `WORLD_ID_ROUTER`: `0x17B354dD2595411ff79041f930e491A4Df39A278`
+- `GROUP_ID`: `1` (Orb credentials only)
 
 #### BeefyVaultV7Factory.sol — Vault Factory
 
@@ -391,7 +388,6 @@ Used by Beefy for slippage protection on swaps.
    d. strategy.initialize(vault, morphoUSDCVault, merklDistributor, swapper)
 7. Create WLD Vault (same pattern)
 8. Set agent address as keeper on each strategy
-9. Set backend signer for World ID whitelist on each vault
 ```
 
 **Deployment script:** `script/Deploy.s.sol`
@@ -499,7 +495,7 @@ Core test cases:
 | deposit() | ~150K | ~$0.02 |
 | withdraw() | ~120K | ~$0.01 |
 | harvest() | ~350K | ~$0.05 |
-| setVerified() | ~45K | ~$0.005 |
+| verifyHuman() | ~200K | ~$0.02 (one-time per user) |
 
 Harvest gas is paid by the agent. This is amortized across ALL depositors — one of the key value propositions.
 
@@ -979,20 +975,9 @@ const SESSION_CONFIG = {
 };
 ```
 
-**HMAC Nullifier Hashing:** The raw World ID nullifier hash is never stored directly. It is hashed server-side using HMAC-SHA256 with a dedicated secret, separate from the JWT secret. This ensures that even if the database is compromised, raw nullifiers cannot be recovered.
+**Nullifier storage:** Nullifier hashes are stored on-chain in the vault's `nullifierHashes` mapping. Each nullifier can only be used once — replay attempts revert on-chain. No backend nullifier storage is required.
 
-```typescript
-import { createHmac } from "crypto";
-
-function hashNullifier(nullifierHash: string): string {
-  return createHmac("sha256", process.env.NULLIFIER_HMAC_SECRET!)
-    .update(nullifierHash)
-    .digest("hex");
-}
-// Env var required: NULLIFIER_HMAC_SECRET (generate with: openssl rand -base64 32)
-```
-
-**Session JWT:** The session token contains the wallet address and the HMAC'd nullifier:
+**Session JWT:** The session token contains the wallet address:
 
 ```typescript
 import { SignJWT, jwtVerify } from "jose";
@@ -1070,19 +1055,24 @@ assertWalletMatch(sessionWallet, wallet);
 
 ### 7.5 On-Chain World ID Gating
 
-After backend verification, the backend's signer EOA calls `setVerified(userAddress, true)` on the vault contract. This whitelists the user for deposits.
+The user calls `verifyHuman()` directly on the vault with their IDKit proof. No backend signer is needed. The vault verifies the proof against the WorldID Router on-chain, stores the nullifier to prevent replay, and sets `verifiedHumans[msg.sender] = true`.
 
 ```typescript
-// Backend signer (after World ID proof verified)
-const tx = await signerWallet.writeContract({
-  address: VAULT_ADDRESS,
-  abi: VAULT_ABI,
-  functionName: "setVerified",
-  args: [userAddress, true],
+// Frontend: after IDKit returns proof
+const { merkle_root, nullifier_hash, proof } = verifyResult.finalPayload;
+
+// MiniKit sendTransaction — user calls verifyHuman() on the vault
+await sendTransaction({
+  transaction: [{
+    address: VAULT_ADDRESS,
+    abi: VAULT_ABI,
+    functionName: "verifyHuman",
+    args: [merkle_root, nullifier_hash, proof],
+  }]
 });
 ```
 
-This only needs to happen once per user per vault.
+This only needs to happen once per wallet address. After it succeeds, the user can `deposit()` freely.
 
 ---
 
@@ -2033,13 +2023,8 @@ NEXT_PUBLIC_WLD_VAULT_ADDRESS=0x...                 # Deployed BeefyVaultV7 for 
 NEXT_PUBLIC_USDC_TOKEN_ADDRESS=0x...                # USDC.e on World Chain
 NEXT_PUBLIC_WLD_TOKEN_ADDRESS=0x2cFc85d8E48F8EAB294be644d9E25C3030863003
 
-# ── Backend Signer ───────────────────────────────────
-SIGNER_PRIVATE_KEY=0x...                            # EOA that calls setVerified()
-                                                    # NEVER expose client-side
-
 # ── Session ──────────────────────────────────────────
 SESSION_SECRET=random-32-byte-hex-string            # For signing session cookies
-NULLIFIER_HMAC_SECRET=random-32-byte-string          # For HMAC'ing nullifier hashes (openssl rand -base64 32)
 ```
 
 ### 11.2 Agent (.env)
@@ -2085,7 +2070,7 @@ X402_MAX_PAYMENT_USD=0.01                           # Max per-request payment
 # ── Foundry Deployment ───────────────────────────────
 DEPLOYER_PRIVATE_KEY=0x...                          # Deployer EOA private key
 KEEPER_ADDRESS=0x...                                # Agent's keeper EOA address
-SIGNER_ADDRESS=0x...                                # Backend signer for setVerified()
+WORLD_ID_EXTERNAL_NULLIFIER_HASH=0x...              # keccak256(abi.encodePacked(appId, "deposit"))
 WORLD_CHAIN_RPC_URL=https://worldchain-mainnet.g.alchemy.com/v2/KEY
 ETHERSCAN_API_KEY=...                               # For contract verification (if supported)
 ```
@@ -2776,17 +2761,18 @@ World App has 40 million users. A mini app that lets them deposit into a yield v
   },
   {
     "inputs": [
-      { "name": "_user", "type": "address" },
-      { "name": "_status", "type": "bool" }
+      { "name": "root", "type": "uint256" },
+      { "name": "nullifierHash", "type": "uint256" },
+      { "name": "proof", "type": "uint256[8]" }
     ],
-    "name": "setVerified",
+    "name": "verifyHuman",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [{ "name": "", "type": "address" }],
-    "name": "worldIdVerified",
+    "name": "verifiedHumans",
     "outputs": [{ "name": "", "type": "bool" }],
     "stateMutability": "view",
     "type": "function"

@@ -862,44 +862,64 @@ export async function handleWithdraw(
 
 ### 3.3 Wallet Auth + World ID Verification
 
+World ID verification happens **on-chain** via `vault.verifyHuman()`. The frontend collects the ZK proof via IDKit, then submits it as a contract call through MiniKit. No backend signer or `/api/auth/verify-worldid` endpoint is needed — the vault calls `WORLD_ID_ROUTER.verifyProof()` directly.
+
 ```typescript
 // src/lib/auth.ts
 import { MiniKit } from "@worldcoin/minikit-js";
+import { IDKitWidget, orbLegacy } from "@worldcoin/idkit";
 
-export async function authenticateWithWorldId(): Promise<{
-  address: string;
-  nullifierHash: string;
-}> {
-  if (!MiniKit.isInstalled()) throw new Error("Open in World App");
+/**
+ * Step 1: Collect World ID proof via IDKit widget, then submit on-chain.
+ * Called when a new user clicks "Verify Human" before their first deposit.
+ */
+export async function verifyHumanOnChain(
+  vaultAddress: string,
+  walletAddress: string,
+  idkitProof: {
+    merkle_root: string;
+    nullifier_hash: string;
+    proof: string;
+  }
+): Promise<string> {
+  // Decode proof from IDKit (packed uint256[8])
+  const proofArray = decodeAbiParameters(
+    [{ type: "uint256[8]" }],
+    idkitProof.proof as `0x${string}`
+  )[0];
 
-  // Step 1: Get nonce
-  const { nonce } = await fetch("/api/auth/nonce").then((r) => r.json());
-
-  // Step 2: World ID verify (proves human)
-  const verifyResult = await MiniKit.commandsAsync.verify({
-    action: "harvest-v2-auth",
-    verification_level: "orb",
+  // Submit verifyHuman() via MiniKit sendTransaction
+  const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
+    transaction: [
+      {
+        address: vaultAddress,
+        abi: VAULT_ABI,
+        functionName: "verifyHuman",
+        args: [
+          BigInt(idkitProof.merkle_root),
+          BigInt(idkitProof.nullifier_hash),
+          proofArray,
+        ],
+      },
+    ],
   });
 
-  if (verifyResult.finalPayload.status === "error") {
-    throw new Error("World ID verification failed");
+  if (finalPayload.status === "error") {
+    throw new Error("World ID on-chain verification failed");
   }
 
-  const { merkle_root, nullifier_hash, proof } = verifyResult.finalPayload;
+  return finalPayload.transaction_id; // userOpHash
+}
 
-  // Step 3: Verify on backend
-  const verifyRes = await fetch("/api/auth/verify-worldid", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ merkle_root, nullifier_hash, proof }),
-  });
+/**
+ * Step 2: SIWE wallet auth (gets session for API calls).
+ */
+export async function walletAuth(): Promise<string> {
+  const { nonce } = await fetch("/api/auth/nonce").then((r) => r.json());
 
-  if (!verifyRes.ok) throw new Error("Backend verification failed");
-
-  // Step 4: SIWE wallet auth (gets wallet address)
   const walletResult = await MiniKit.commandsAsync.walletAuth({
     nonce,
-    statement: "Sign in to Harvest v2 to manage your yield vaults",
+    statement: "Sign in to Harvest to manage your yield vaults",
     expirationTime: new Date(Date.now() + 15 * 60 * 1000),
   });
 
@@ -907,20 +927,13 @@ export async function authenticateWithWorldId(): Promise<{
     throw new Error("Wallet auth failed");
   }
 
-  // Step 5: Create session
   const session = await fetch("/api/auth/verify-siwe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      payload: walletResult.finalPayload,
-      nullifier_hash,
-    }),
+    body: JSON.stringify({ payload: walletResult.finalPayload }),
   }).then((r) => r.json());
 
-  return {
-    address: session.wallet_address,
-    nullifierHash: nullifier_hash,
-  };
+  return session.wallet_address;
 }
 ```
 
@@ -2188,33 +2201,20 @@ Creates JWT session from SIWE wallet auth. Includes HMAC nullifier hashing and p
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
-import { createHmac } from "crypto";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
-/**
- * hashNullifier: one-way HMAC of the World ID nullifier hash.
- * Computed SERVER-SIDE ONLY -- raw nullifier never stored or leaked.
- * Uses a dedicated secret separate from JWT_SECRET.
- *
- * Env var: NULLIFIER_HMAC_SECRET (generate with: openssl rand -base64 32)
- */
-function hashNullifier(nullifierHash: string): string {
-  return createHmac("sha256", process.env.NULLIFIER_HMAC_SECRET!)
-    .update(nullifierHash)
-    .digest("hex");
-}
-
 export async function POST(req: NextRequest) {
-  const { payload, nullifier_hash } = await req.json();
+  const { payload } = await req.json();
 
   // 1. Verify SIWE signature (via MiniKit utility or manual verification)
   // ...signature verification here...
 
-  // 2. Create session JWT with HMAC'd nullifier
+  // 2. Create session JWT
+  // Note: World ID nullifier replay protection is enforced on-chain by the vault
+  // contract (nullifierHashes mapping). No backend nullifier storage needed.
   const token = await new SignJWT({
     wallet: payload.address,
-    nullifier: hashNullifier(nullifier_hash),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("15m")
@@ -2284,19 +2284,9 @@ All state-changing API routes (POST, PUT, DELETE) are protected by the session c
 
 No additional CSRF token needed for the hackathon. For production, add a double-submit cookie or synchronizer token pattern.
 
-### 7.2.3 World ID Proof Freshness Check
+### 7.2.3 World ID Replay Protection
 
-<!-- Merged from claimall-spec.md -->
-
-In the verify-worldid endpoint, check proof freshness to prevent replay attacks:
-
-```typescript
-const PROOF_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
-const proofAge = Date.now() - proofTimestamp;
-if (proofAge > PROOF_MAX_AGE_MS) {
-  return new Response("Proof expired: must be less than 5 minutes old", { status: 400 });
-}
-```
+World ID replay protection is enforced **on-chain** by the vault contract. The `nullifierHashes` mapping stores each used nullifier permanently. Replay attempts revert with `"Harvest: nullifier already used"`. No backend freshness check or `/api/auth/verify-worldid` endpoint is needed.
 
 ### 7.3 Auth: POST /api/auth/logout
 
@@ -2962,7 +2952,6 @@ harvest-v2/
 │   │       ├── auth/
 │   │       │   ├── nonce/route.ts
 │   │       │   ├── verify-siwe/route.ts
-│   │       │   ├── verify-worldid/route.ts
 │   │       │   └── logout/route.ts
 │   │       │
 │   │       ├── vaults/
@@ -3050,7 +3039,6 @@ ALCHEMY_KEY=YOUR_KEY
 # Session / Auth
 # ============================================================
 JWT_SECRET=<openssl rand -hex 32>
-NULLIFIER_HMAC_SECRET=<openssl rand -hex 32>
 
 # ============================================================
 # Contract Addresses (filled after deployment)

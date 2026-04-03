@@ -2,8 +2,9 @@
 pragma solidity 0.8.28;
 
 import {BaseTest} from "../base/BaseTest.sol";
+import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {StrategyMorpho} from "../../src/StrategyMorpho.sol";
+import {StrategyMorphoMerkl} from "../../src/StrategyMorphoMerkl.sol";
 import {IStrategyV7} from "../../src/interfaces/IStrategyV7.sol";
 
 contract BeefyVaultV7Test is BaseTest {
@@ -116,7 +117,6 @@ contract BeefyVaultV7Test is BaseTest {
 
     function test_getPricePerFullShare_after_deposit() public {
         _depositAs(user, 1000e6);
-        // Share price should still be ~1e18 (scaled for 6 decimal want)
         assertGt(vault.getPricePerFullShare(), 0);
     }
 
@@ -126,8 +126,6 @@ contract BeefyVaultV7Test is BaseTest {
 
         _simulateYield(1.1e18); // 10% yield in Morpho vault
 
-        // Harvest crystallizes the yield (extracts excess shares → native → want)
-        vm.prank(keeper);
         strategy.harvest();
 
         // Skip past the 1-day lock duration so profit is fully released
@@ -171,15 +169,34 @@ contract BeefyVaultV7Test is BaseTest {
         assertGt(vault.balanceOf(verified), 0);
     }
 
+    function test_registered_agent_can_deposit() public {
+        address agent = makeAddr("agent");
+        agentBook.setRegistered(agent, true);
+        _depositAs(agent, 1000e6);
+        assertGt(vault.balanceOf(agent), 0);
+    }
+
+    function test_unregistered_agent_cannot_deposit() public {
+        address agent = makeAddr("agent");
+        // agentBook returns 0 by default — not registered
+        deal(address(want), agent, 1000e6);
+        vm.startPrank(agent);
+        want.approve(PERMIT2_ADDR, 1000e6);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        PERMIT2.approve(address(want), address(vault), uint160(1000e6), uint48(block.timestamp + 1 days));
+        vm.expectRevert("Harvest: humans only");
+        vault.deposit(1000e6);
+        vm.stopPrank();
+    }
+
     // ── Strategy management ───────────────────────────────────────────────────
 
     function test_setStrategy_owner_can_swap() public {
-        // Put some funds in first
         _depositAs(user, 1000e6);
 
         address[] memory noRewards = new address[](0);
         vm.startPrank(owner);
-        StrategyMorpho newStrat = new StrategyMorpho();
+        StrategyMorphoMerkl newStrat = new StrategyMorphoMerkl();
         newStrat.initialize(
             address(morphoVault),
             address(claimer),
@@ -188,10 +205,10 @@ contract BeefyVaultV7Test is BaseTest {
             BaseAllToNativeFactoryStrat.Addresses({
                 want: address(want),
                 depositToken: address(0),
-                factory: address(strategyFactory),
                 vault: address(vault),
                 swapper: address(swapper),
-                strategist: strategist
+                strategist: strategist,
+                feeRecipient: feeRecipient
             })
         );
         vault.setStrategy(IStrategyV7(address(newStrat)));
@@ -230,10 +247,6 @@ contract BeefyVaultV7Test is BaseTest {
     function test_balance_includes_strategy_holdings() public {
         _depositAs(user, 1000e6);
 
-        // All funds should be in strategy (earn() was called during deposit)
         assertApproxEqAbs(vault.balance(), 1000e6, 2);
     }
 }
-
-// Needed for the setStrategy test
-import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
