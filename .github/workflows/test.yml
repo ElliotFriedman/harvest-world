@@ -58,6 +58,29 @@ jobs:
         env:
           APP_ID: "app_test"
 
+  app-build:
+    name: App Build
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_ID: "app_test"
+      NEXT_PUBLIC_VAULT_ADDRESS: "0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD"
+      WORLD_RP_ID: "rp_test"
+      RP_SIGNING_KEY: "0x0000000000000000000000000000000000000000000000000000000000000001"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Build
+        working-directory: app
+        run: npm run build
+
   integration:
     name: Fork Tests (World Chain)
     runs-on: ubuntu-latest
