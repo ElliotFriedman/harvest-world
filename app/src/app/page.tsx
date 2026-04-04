@@ -78,7 +78,7 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v2.3 — Agentic DeFi, for humans.",
+    "HARVEST v2.4 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
@@ -296,13 +296,15 @@ export default function Terminal() {
 
       if (vaultShares > BigInt(0)) setHasShares(true);
 
-      const usdValue = (vaultShares * pricePerShare) / BigInt(1e18);
+      const vaultUsdValue = (vaultShares * pricePerShare) / BigInt(1e18);
+      const totalUsdValue = usdcBalance + vaultUsdValue;
 
       print(
         `Portfolio for ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
         `  USDC in wallet: $${formatBigintUSDC(usdcBalance)}`,
         `  Vault shares:   ${formatBigintUSDC(vaultShares)} hvUSDC`,
-        `  USD value:      $${formatBigintUSDC(usdValue)}`,
+        `  Vault USD value: $${formatBigintUSDC(vaultUsdValue)}`,
+        `  Total USD value: $${formatBigintUSDC(totalUsdValue)}`,
         ""
       );
     } catch {
