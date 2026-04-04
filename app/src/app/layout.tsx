@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { MiniKitProvider } from "./minikit-provider";
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["300", "400", "700"],
+  variable: "--font-harvest-loaded",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Harvest",
@@ -34,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={jetbrainsMono.variable}>
       <body>
         <MiniKitProvider>{children}</MiniKitProvider>
       </body>
