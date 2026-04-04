@@ -171,22 +171,22 @@ export default function Terminal() {
       const tvl = await getVaultTvl();
       const tvlFormatted = formatBigintUSDC(tvl);
       print(
-        "┌─────────────────────────────────────────────────────┐",
-        "│  Vault          APY     TVL              Status     │",
-        "├─────────────────────────────────────────────────────┤",
-        `│  USDC (Re7)     4.23%   $${tvlFormatted.padEnd(15)} ● LIVE     │`,
-        "└─────────────────────────────────────────────────────┘",
-        "Deposit: harvest> deposit <amount>",
+        "USDC (Re7 Morpho)",
+        `  APY:    4.23%`,
+        `  TVL:    $${tvlFormatted}`,
+        `  Status: LIVE`,
+        "",
+        "deposit <amount> to enter",
         ""
       );
     } catch {
       print(
-        "┌─────────────────────────────────────────────────────┐",
-        "│  Vault          APY     TVL         Status          │",
-        "├─────────────────────────────────────────────────────┤",
-        "│  USDC (Re7)     4.23%   --          ● LIVE          │",
-        "└─────────────────────────────────────────────────────┘",
-        "Deposit: harvest> deposit <amount>",
+        "USDC (Re7 Morpho)",
+        "  APY:    4.23%",
+        "  TVL:    --",
+        "  Status: LIVE",
+        "",
+        "deposit <amount> to enter",
         ""
       );
     }
