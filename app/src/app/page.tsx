@@ -341,12 +341,21 @@ export default function Terminal() {
         ? `~${s.uniswapQuote.expectedOutput} (impact: ${s.uniswapQuote.priceImpact}%)`
         : "";
 
+      const streamingStr = (() => {
+        if (!s.streaming) return null;
+        const h = Math.floor(s.streaming.unlocksInMs / 3_600_000);
+        const m = Math.floor((s.streaming.unlocksInMs % 3_600_000) / 60_000);
+        const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+        return `streaming $${s.streaming.lockedUsd} USDC to depositors — fully unlocked in ${timeStr}`;
+      })();
+
       print(
         "HARVESTER AGENT",
         `  Status:         ● ${s.status.toUpperCase()}`,
         `  Pool balance:   ${poolUSD}`,
         `  Pending yield:  ${rewardStr}`,
         ...(swapEstimate ? [`  Swap estimate:  ${swapEstimate}`] : []),
+        ...(streamingStr ? [`  Yield stream:   ${streamingStr}`] : []),
         `  Last harvest:   ${lastHarvestStr}`,
         `  Next check:     ${nextCheckStr}`,
         ""

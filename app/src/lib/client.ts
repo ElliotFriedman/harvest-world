@@ -41,6 +41,7 @@ export interface AgentStatus {
   nextCheck: string;
   balanceOfPool?: string;
   uniswapQuote?: { expectedOutput: string; gasFeeUSD: string; priceImpact: string; routing: string } | null;
+  streaming?: { lockedUsd: string; unlocksInMs: number } | null;
 }
 
 export interface HarvestResult {

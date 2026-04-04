@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { createPublicClient, http } from "viem";
 import {
   STRATEGY_ADDRESS,
-  VAULT_ADDRESS,
   WLD_ADDRESS,
   strategyAbi,
-  vaultAbi,
   harvestStore,
   fetchMerklRewards,
   fetchWldPrice,
@@ -29,14 +27,11 @@ const client = createPublicClient({
 export async function GET() {
   try {
     // Fetch on-chain data + Merkl rewards + WLD price in parallel
-    const [balanceOfPool, merklRewards, wldPrice] = await Promise.all([
-      client
-        .readContract({
-          address: STRATEGY_ADDRESS,
-          abi: strategyAbi,
-          functionName: "balanceOfPool",
-        })
-        .catch(() => BigInt(0)),
+    const [balanceOfPool, totalLocked, lastHarvestTs, lockDuration, merklRewards, wldPrice] = await Promise.all([
+      client.readContract({ address: STRATEGY_ADDRESS, abi: strategyAbi, functionName: "balanceOfPool" }).catch(() => BigInt(0)),
+      client.readContract({ address: STRATEGY_ADDRESS, abi: strategyAbi, functionName: "totalLocked" }).catch(() => BigInt(0)),
+      client.readContract({ address: STRATEGY_ADDRESS, abi: strategyAbi, functionName: "lastHarvest" }).catch(() => BigInt(0)),
+      client.readContract({ address: STRATEGY_ADDRESS, abi: strategyAbi, functionName: "lockDuration" }).catch(() => BigInt(86400)),
       fetchMerklRewards(STRATEGY_ADDRESS),
       fetchWldPrice(),
     ]);
@@ -73,6 +68,20 @@ export async function GET() {
       };
     }
 
+    // Streaming profit info
+    const nowSec = BigInt(Math.floor(Date.now() / 1000));
+    const unlocksAt = lastHarvestTs + lockDuration;
+    const remaining = unlocksAt > nowSec ? unlocksAt - nowSec : BigInt(0);
+    const lockedProfitUsdc = lockDuration > BigInt(0) && totalLocked > BigInt(0)
+      ? (totalLocked * remaining) / lockDuration
+      : BigInt(0);
+    const streaming = lockedProfitUsdc > BigInt(0)
+      ? {
+          lockedUsd: (Number(lockedProfitUsdc) / 1e6).toFixed(4),
+          unlocksInMs: Number(remaining) * 1000,
+        }
+      : null;
+
     // Last harvest from store
     const lastHarvest =
       harvestStore.length > 0 ? harvestStore[harvestStore.length - 1] : null;
@@ -91,6 +100,7 @@ export async function GET() {
       nextCheck,
       balanceOfPool: balanceOfPool.toString(),
       uniswapQuote,
+      streaming,
     });
   } catch (err) {
     console.error("Agent status error:", err);
@@ -106,6 +116,7 @@ export async function GET() {
       nextCheck: new Date(Date.now() + 6 * 3600_000).toISOString(),
       balanceOfPool: "0",
       uniswapQuote: null,
+      streaming: null,
     });
   }
 }
