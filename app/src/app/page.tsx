@@ -11,7 +11,7 @@ import {
   orbLegacy,
 } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, decodeAbiParameters } from "viem";
 import {
   getBalances,
   getVaultTvl,
@@ -80,12 +80,9 @@ const WITHDRAW_ABI = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// IDKit v3 returns proof as 0x + 8 packed uint256s (64 hex chars each = 512 hex chars)
-function decodeProof(hex: string): bigint[] {
-  const raw = hex.startsWith("0x") ? hex.slice(2) : hex;
-  return Array.from({ length: 8 }, (_, i) =>
-    BigInt("0x" + raw.slice(i * 64, (i + 1) * 64))
-  );
+// IDKit v3 returns proof as ABI-encoded uint256[8] (with 32-byte offset prefix)
+function decodeProof(proof: `0x${string}`): bigint[] {
+  return [...decodeAbiParameters([{ type: "uint256[8]" }], proof)[0]];
 }
 
 function formatUSDC(amount: number): string {
@@ -494,7 +491,7 @@ export default function Terminal() {
           const v3 = response as ResponseItemV3;
           root = BigInt(v3.merkle_root);
           nullifierHash = BigInt(v3.nullifier);
-          const decoded = decodeProof(v3.proof);
+          const decoded = decodeProof(v3.proof as `0x${string}`);
           proofArray = decoded.map((d) => BigInt(d)) as unknown as typeof proofArray;
         } else if ("nullifier" in response) {
           const v4 = response as ResponseItemV4;
