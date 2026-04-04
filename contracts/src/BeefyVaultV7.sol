@@ -10,8 +10,6 @@ import {
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
-import {IWorldID} from "./interfaces/IWorldID.sol";
-import {IAgentBook} from "./interfaces/IAgentBook.sol";
 
 import {IStrategyV7} from "./interfaces/IStrategyV7.sol";
 
@@ -29,36 +27,6 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     // Permit2 for token transfers (World App pre-approves all tokens to this contract)
     IAllowanceTransfer public constant PERMIT2 = IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
-    // World ID on-chain verification (WorldIDRouter on World Chain mainnet)
-    IWorldID public constant WORLD_ID_ROUTER = IWorldID(0x17B354dD2595411ff79041f930e491A4Df39A278);
-    uint256 public constant GROUP_ID = 1; // Orb credentials only
-
-    // AgentBook registry — maps human-backed agent wallets → humanId (nullifierHash)
-    // Agents register via: npx @worldcoin/agentkit-cli register <wallet>
-    IAgentBook public constant AGENT_BOOK = IAgentBook(0xA23aB2712eA7BBa896930544C7d6636a96b944dA);
-
-    // Derived from app_id + action, set in initialize()
-    uint256 public externalNullifierHash;
-
-    // Sybil resistance: each nullifier can only be used once
-    mapping(uint256 => bool) public nullifierHashes;
-
-    // Verified humans (World ID) and human-backed agents (AgentKit)
-    mapping(address => bool) public verifiedHumans;
-
-    event HumanVerification(address indexed user, bool verified);
-
-    error InvalidNullifier();
-
-    modifier onlyHuman() {
-        _onlyHuman();
-        _;
-    }
-
-    function _onlyHuman() private view {
-        require(verifiedHumans[msg.sender] || AGENT_BOOK.lookupHuman(msg.sender) != 0, "Harvest: humans only");
-    }
-
     /**
      * @dev Sets the value of {token} to the token that the vault will
      * hold as underlying value. It initializes the vault's own 'moo' token.
@@ -68,17 +36,11 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * @param _name the name of the vault token.
      * @param _symbol the symbol of the vault token.
      */
-    function initialize(
-        IStrategyV7 _strategy,
-        string memory _name,
-        string memory _symbol,
-        uint256 _externalNullifierHash
-    ) public initializer {
+    function initialize(IStrategyV7 _strategy, string memory _name, string memory _symbol) public initializer {
         __ERC20_init(_name, _symbol);
         __Ownable_init();
         __ReentrancyGuard_init();
         strategy = _strategy;
-        externalNullifierHash = _externalNullifierHash;
     }
 
     function want() public view returns (IERC20Upgradeable) {
@@ -115,7 +77,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     /**
      * @dev A helper function to call deposit() with all the sender's funds.
      */
-    function depositAll() external onlyHuman {
+    function depositAll() external {
         deposit(want().balanceOf(msg.sender));
     }
 
@@ -125,7 +87,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * Pulls tokens via Permit2 allowance-based transferFrom.
      * User must have approved this vault as a Permit2 spender beforehand.
      */
-    function deposit(uint256 _amount) public onlyHuman nonReentrant {
+    function deposit(uint256 _amount) public nonReentrant {
         strategy.beforeDeposit();
 
         uint256 _pool = balance();
@@ -151,7 +113,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
     /**
      * @dev A helper function to call withdraw() with all the sender's funds.
      */
-    function withdrawAll() external onlyHuman {
+    function withdrawAll() external {
         withdraw(balanceOf(msg.sender));
     }
 
@@ -160,7 +122,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * from the strategy and pay up the token holder. A proportional number of IOU
      * tokens are burned in the process.
      */
-    function withdraw(uint256 _shares) public onlyHuman {
+    function withdraw(uint256 _shares) public {
         uint256 r = (balance() * _shares) / totalSupply();
         _burn(msg.sender, _shares);
 
@@ -176,23 +138,6 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
         }
 
         want().safeTransfer(msg.sender, r);
-    }
-
-    /**
-     * @dev Verify a human via World ID on-chain proof. Trustless — no backend needed.
-     * User calls this once with their IDKit proof, then can deposit freely.
-     * Signal is msg.sender, so the proof is bound to the caller's address.
-     */
-    function verifyHuman(uint256 root, uint256 nullifierHash, uint256[8] calldata proof) external {
-        if (nullifierHashes[nullifierHash]) revert InvalidNullifier();
-
-        WORLD_ID_ROUTER.verifyProof(
-            root, GROUP_ID, _hashToField(abi.encodePacked(msg.sender)), nullifierHash, externalNullifierHash, proof
-        );
-
-        nullifierHashes[nullifierHash] = true;
-        verifiedHumans[msg.sender] = true;
-        emit HumanVerification(msg.sender, true);
     }
 
     /**
@@ -217,13 +162,5 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
 
         uint256 amount = IERC20Upgradeable(_token).balanceOf(address(this));
         IERC20Upgradeable(_token).safeTransfer(msg.sender, amount);
-    }
-
-    /**
-     * @dev Hash a value to a field element for World ID proof verification.
-     * Matches the ByteHasher.hashToField() from World ID contracts.
-     */
-    function _hashToField(bytes memory value) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(value))) >> 8;
     }
 }

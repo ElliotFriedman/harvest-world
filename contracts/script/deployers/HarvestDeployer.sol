@@ -22,7 +22,6 @@ library HarvestDeployer {
         string vaultSymbol;
         bool harvestOnDeposit;
         address[] rewards;
-        uint256 externalNullifierHash; // World ID: hash of app_id + action
     }
 
     struct Deployment {
@@ -49,9 +48,6 @@ library HarvestDeployer {
         d.strategy.initialize(ext.morphoVault, ext.claimer, params.harvestOnDeposit, params.rewards, addrs);
 
         // 4. Initialize vault
-        d.vault
-            .initialize(
-                IStrategyV7(address(d.strategy)), params.vaultName, params.vaultSymbol, params.externalNullifierHash
-            );
+        d.vault.initialize(IStrategyV7(address(d.strategy)), params.vaultName, params.vaultSymbol);
     }
 }

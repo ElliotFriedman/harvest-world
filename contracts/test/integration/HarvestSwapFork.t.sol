@@ -66,8 +66,6 @@ contract HarvestSwapForkTest is Test {
             _deploySystem();
             vm.stopPrank();
         }
-
-        _setVerifiedInTest(user, true);
     }
 
     // ── Setup helpers (used only when deploying fresh) ────────────────────────
@@ -123,19 +121,12 @@ contract HarvestSwapForkTest is Test {
             vaultName: "Moo World Morpho USDC",
             vaultSymbol: "mooWorldMorphoUSDC",
             harvestOnDeposit: false,
-            rewards: rewards,
-            externalNullifierHash: 1
+            rewards: rewards
         });
 
         HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);
         vault = d.vault;
         strategy = d.strategy;
-    }
-
-    /// @dev Directly set verifiedHumans[_user] via vm.store (slot 204).
-    function _setVerifiedInTest(address _user, bool _status) internal {
-        bytes32 slot = keccak256(abi.encode(_user, uint256(204)));
-        vm.store(address(vault), slot, _status ? bytes32(uint256(1)) : bytes32(uint256(0)));
     }
 
     function _depositAs(address depositor, uint256 amount) internal {

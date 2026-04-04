@@ -13,14 +13,11 @@ import {MockBeefySwapper} from "../mocks/MockBeefySwapper.sol";
 import {MockMerklClaimer} from "../mocks/MockMerklClaimer.sol";
 import {MockMorphoVault} from "../mocks/MockMorphoVault.sol";
 import {MockPermit2} from "../mocks/MockPermit2.sol";
-import {MockAgentBook} from "../mocks/MockAgentBook.sol";
 
 abstract contract BaseTest is Test {
     address internal constant PERMIT2_ADDR = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
     // WETH on World Chain mainnet — hardcoded in BaseAllToNativeFactoryStrat.NATIVE
     address internal constant NATIVE_ADDR = 0x4200000000000000000000000000000000000006;
-    // World AgentBook — etched with MockAgentBook so unit tests don't hit a non-contract address
-    address internal constant AGENT_BOOK_ADDR = 0xA23aB2712eA7BBa896930544C7d6636a96b944dA;
 
     IAllowanceTransfer internal constant PERMIT2 = IAllowanceTransfer(PERMIT2_ADDR);
 
@@ -29,7 +26,6 @@ abstract contract BaseTest is Test {
     StrategyMorphoMerkl internal strategy;
 
     // Mocks
-    MockAgentBook internal agentBook; // etched at AGENT_BOOK_ADDR
     MockERC20 internal want; // USDC — 6 decimals
     MockERC20 internal native; // WETH — 18 decimals, etched to NATIVE_ADDR
     MockERC20 internal rewardToken; // MORPHO — 18 decimals
@@ -59,14 +55,6 @@ abstract contract BaseTest is Test {
     }
 
     function _deployMocks() internal virtual {
-        // Etch MockAgentBook at the hardcoded AGENT_BOOK address so unit tests
-        // don't revert with "call to non-contract address" when _onlyHuman runs.
-        // By default lookupHuman returns 0 (not registered); call
-        // agentBook.setRegistered(addr, true) to test the agent-deposit path.
-        MockAgentBook agentBookImpl = new MockAgentBook();
-        vm.etch(AGENT_BOOK_ADDR, address(agentBookImpl).code);
-        agentBook = MockAgentBook(AGENT_BOOK_ADDR);
-
         want = new MockERC20("USD Coin", "USDC", 6);
         rewardToken = new MockERC20("Morpho Token", "MORPHO", 18);
 
@@ -104,11 +92,7 @@ abstract contract BaseTest is Test {
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
-            vaultName: "Moo Morpho USDC",
-            vaultSymbol: "mooMorphoUSDC",
-            harvestOnDeposit: false,
-            rewards: rewards,
-            externalNullifierHash: 1 // test placeholder
+            vaultName: "Moo Morpho USDC", vaultSymbol: "mooMorphoUSDC", harvestOnDeposit: false, rewards: rewards
         });
 
         // owner becomes msg.sender for all external calls → owner of vault and strategy
@@ -128,22 +112,11 @@ abstract contract BaseTest is Test {
         // Pre-fund swapper with output tokens
         deal(NATIVE_ADDR, address(swapper), 1_000 ether);
         deal(address(want), address(swapper), 100_000e6);
-
-        // Mark the test user as a verified human
-        _setVerifiedInTest(user, true);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /// @dev Directly set verifiedHumans[user] via vm.store (slot 204).
-    ///      Bypasses World ID proof verification for unit testing.
-    function _setVerifiedInTest(address _user, bool _status) internal {
-        bytes32 slot = keccak256(abi.encode(_user, uint256(204)));
-        vm.store(address(vault), slot, _status ? bytes32(uint256(1)) : bytes32(uint256(0)));
-    }
-
     /// @dev Mint want to `depositor`, approve Permit2, then deposit into vault.
-    ///      The depositor must already be verified (call _setVerifiedInTest first).
     function _depositAs(address depositor, uint256 amount) internal {
         deal(address(want), depositor, amount);
         vm.startPrank(depositor);
