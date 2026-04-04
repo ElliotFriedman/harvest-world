@@ -12,7 +12,12 @@ import {
 } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData } from "viem";
-import { getBalances, getVaultTvl } from "../lib/client";
+import {
+  getBalances,
+  getVaultTvl,
+  getAgentStatus,
+  triggerHarvest,
+} from "../lib/client";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -155,12 +160,13 @@ export default function Terminal() {
   async function handleHelp() {
     print(
       "Commands:",
-      "  vaults       — list vaults + APY",
-      "  deposit <n>  — deposit USDC",
-      "  withdraw all — exit position",
-      "  portfolio    — your balance",
-      "  agent status — harvester info",
-      "  clear        — clear screen",
+      "  vaults         — list vaults + APY",
+      "  deposit <n>    — deposit USDC",
+      "  withdraw all   — exit position",
+      "  portfolio      — your balance",
+      "  agent status   — harvester info",
+      "  agent harvest  — trigger harvest",
+      "  clear          — clear screen",
       ""
     );
   }
@@ -330,20 +336,114 @@ export default function Terminal() {
   }
 
   async function handleAgentStatus() {
-    print(
-      "Harvester Agent",
-      "  Status:         ● ACTIVE",
-      "  Last harvest:   never",
-      "  Next check:     in ~6h",
-      "  Pending yield:  0 WLD",
-      ""
-    );
+    print("Loading agent status...");
+    try {
+      const data = await getAgentStatus();
+
+      // Format time-ago for last harvest
+      let lastHarvestStr = "never";
+      if (data.lastHarvest) {
+        const ago = Date.now() - new Date(data.lastHarvest.timestamp).getTime();
+        const mins = Math.floor(ago / 60_000);
+        if (mins < 60) lastHarvestStr = `${mins}m ago`;
+        else {
+          const hrs = Math.floor(mins / 60);
+          lastHarvestStr = `${hrs}h ${mins % 60}m ago`;
+        }
+      }
+
+      // Format next check
+      const nextMs = new Date(data.nextCheck).getTime() - Date.now();
+      const nextHrs = Math.max(0, Math.floor(nextMs / 3600_000));
+      const nextMins = Math.max(0, Math.floor((nextMs % 3600_000) / 60_000));
+      const nextStr = nextHrs > 0 ? `in ~${nextHrs}h ${nextMins}m` : `in ~${nextMins}m`;
+
+      // Pending rewards line
+      const pendingStr = data.pendingRewards
+        ? `${data.pendingRewards.amount} (~$${data.pendingRewards.usdValue.toFixed(2)})`
+        : "0 WLD";
+
+      print(
+        "HARVESTER AGENT",
+        `  Status:         \u25CF ACTIVE`,
+        "  Strategy:       StrategyMorpho (Re7 USDC)",
+        `  Last harvest:   ${lastHarvestStr}`,
+        `  Next check:     ${nextStr}`,
+        `  Pending yield:  ${pendingStr}`,
+        ""
+      );
+
+      // Recent harvests table
+      if (data.harvests.length > 0) {
+        print(
+          "  RECENT HARVESTS",
+          "  +------------------+-------------+-------------+-----------+",
+          "  | Time             | Claimed     | Compound    | Tx        |",
+          "  +------------------+-------------+-------------+-----------+"
+        );
+
+        for (const h of data.harvests.slice(0, 5)) {
+          const t = new Date(h.timestamp);
+          const timeStr = `${(t.getMonth() + 1).toString().padStart(2, "0")}/${t.getDate().toString().padStart(2, "0")} ${t.getHours().toString().padStart(2, "0")}:${t.getMinutes().toString().padStart(2, "0")}`;
+          const claimed = h.rewardsClaimed.padEnd(11).slice(0, 11);
+          const compound = h.wantEarned.padEnd(11).slice(0, 11);
+          const tx = h.txHash.slice(0, 8) + "..";
+          print(`  | ${timeStr.padEnd(16)} | ${claimed} | ${compound} | ${tx} |`);
+        }
+
+        print(
+          "  +------------------+-------------+-------------+-----------+",
+          ""
+        );
+      }
+    } catch {
+      print(
+        "HARVESTER AGENT",
+        "  Status:         \u25CF ACTIVE",
+        "  Error loading live data. Using defaults.",
+        "  Strategy:       StrategyMorpho (Re7 USDC)",
+        "  Next check:     in ~6h",
+        ""
+      );
+    }
   }
 
   async function handleAgentHarvest() {
-    print("Triggering manual harvest...");
-    // TODO: POST /api/harvest (calls strategy.harvest() via agent wallet)
-    print("No pending rewards above threshold.", "");
+    print("HARVESTING...");
+    print("  [1/3] Checking Merkl rewards...");
+
+    try {
+      const result = await triggerHarvest();
+
+      if (!result.success) {
+        if (result.reason === "no_rewards") {
+          print("        No unclaimed rewards found.", "");
+        } else if (result.reason === "missing_key") {
+          print("        Agent wallet not configured.", "");
+        } else if (result.reason === "below_threshold") {
+          print("        Rewards below harvest threshold.", "");
+        } else {
+          print(`        Error: ${result.message ?? "harvest failed"}`, "");
+        }
+        return;
+      }
+
+      print(`        ${result.rewardsClaimed ?? "rewards"} available`);
+      print(`  [2/3] Claiming + swapping...        TX: ${(result.txHash ?? "").slice(0, 10)}...`);
+      print(`  [3/3] Compounded into vault         +${result.wantEarned ?? "-- USDC"}`);
+
+      // Share price change
+      if (result.oldSharePrice && result.newSharePrice) {
+        const oldP = Number(BigInt(result.oldSharePrice)) / 1e18;
+        const newP = Number(BigInt(result.newSharePrice)) / 1e18;
+        print("");
+        print(`  Share price: ${oldP.toFixed(6)} -> ${newP.toFixed(6)}`);
+      }
+
+      print("  Next harvest in ~6h.", "");
+    } catch {
+      print("        Error: Could not reach harvest endpoint.", "");
+    }
   }
 
   // ── IDKit flow ───────────────────────────────────────────────────────────────
@@ -648,6 +748,7 @@ export default function Terminal() {
     return [
       { label: "deposit 50", action: () => handleCommand("deposit 50") },
       { label: "portfolio", action: () => handleCommand("portfolio") },
+      { label: "agent status", action: () => handleCommand("agent status") },
       { label: "withdraw all", action: () => handleCommand("withdraw all") },
     ];
   }
