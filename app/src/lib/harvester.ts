@@ -65,6 +65,7 @@ export interface HarvestRecord {
   txHash: string;
   wantEarned: string;
   rewardsClaimed: string;
+  uniswapQuote?: { expectedOutput: string; gasFeeUSD: string; priceImpact: string; routing: string } | null;
 }
 
 export interface MerklReward {
