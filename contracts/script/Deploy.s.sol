@@ -88,8 +88,8 @@ contract Deploy is Script {
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
-            vaultName: "Moo World Morpho USDC",
-            vaultSymbol: "mooWorldMorphoUSDC",
+            vaultName: "Harvest World Morpho USDC",
+            vaultSymbol: "harvestWorldMorphoUSDC",
             harvestOnDeposit: true,
             rewards: rewards
         });

@@ -13,8 +13,8 @@ contract BeefyVaultV7Test is BaseTest {
     // ── Initialization ────────────────────────────────────────────────────────
 
     function test_initialization() public view {
-        assertEq(vault.name(), "Moo Morpho USDC");
-        assertEq(vault.symbol(), "mooMorphoUSDC");
+        assertEq(vault.name(), "Harvest Morpho USDC");
+        assertEq(vault.symbol(), "harvestMorphoUSDC");
         assertEq(address(vault.strategy()), address(strategy));
         assertEq(vault.owner(), owner);
     }

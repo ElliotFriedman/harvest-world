@@ -92,7 +92,7 @@ abstract contract BaseTest is Test {
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
-            vaultName: "Moo Morpho USDC", vaultSymbol: "mooMorphoUSDC", harvestOnDeposit: false, rewards: rewards
+            vaultName: "Harvest Morpho USDC", vaultSymbol: "harvestMorphoUSDC", harvestOnDeposit: false, rewards: rewards
         });
 
         // proxyAdmin is a separate EOA — must differ from owner so owner can call vault/strategy functions.

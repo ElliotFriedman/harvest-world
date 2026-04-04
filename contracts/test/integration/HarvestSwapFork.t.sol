@@ -118,8 +118,8 @@ contract HarvestSwapForkTest is Test {
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
-            vaultName: "Moo World Morpho USDC",
-            vaultSymbol: "mooWorldMorphoUSDC",
+            vaultName: "Harvest World Morpho USDC",
+            vaultSymbol: "harvestWorldMorphoUSDC",
             harvestOnDeposit: false,
             rewards: rewards
         });
