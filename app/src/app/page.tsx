@@ -135,7 +135,7 @@ export default function Terminal() {
     setLines((prev) => [...prev, ...newLines]);
   }, []);
 
-  async function typewriterPrint(text: string, delayMs = 28): Promise<void> {
+  async function typewriterPrint(text: string, delayMs = 42): Promise<void> {
     setLines((prev) => [...prev, ""]);
     for (let i = 1; i <= text.length; i++) {
       await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
@@ -157,6 +157,13 @@ export default function Terminal() {
     setIsFlickering(false);
   }
 
+  // Gentle single-pulse flicker — used mid-narrative for a subtler effect
+  async function gentleFlicker(): Promise<void> {
+    setIsFlickering(true);
+    await new Promise((r) => setTimeout(r, 35));
+    setIsFlickering(false);
+  }
+
   async function runObserverBoot(): Promise<void> {
     await flicker();
     await typewriterPrint("HARVEST OS v2.4");
@@ -174,6 +181,7 @@ export default function Terminal() {
     await new Promise((r) => setTimeout(r, 200));
     await typewriterPrint("You're seeing the outside.");
     await new Promise((r) => setTimeout(r, 600));
+    await gentleFlicker();
     setLines((prev) => [...prev, ""]);
     await typewriterPrint("The humans are inside, earning yield.");
     await new Promise((r) => setTimeout(r, 200));
@@ -889,6 +897,7 @@ export default function Terminal() {
         display: "flex",
         flexDirection: "column",
         padding: "10px",
+        paddingLeft: "clamp(10px, 5vw, 80px)",
         overflow: "hidden",
         opacity: isFlickering ? 0 : 1,
         transition: "opacity 0ms",
@@ -973,7 +982,7 @@ export default function Terminal() {
             style={{
               position: "fixed",
               top: "50%",
-              right: "40px",
+              left: "40px",
               transform: "translateY(-50%)",
               flexDirection: "column",
               alignItems: "center",
