@@ -1,0 +1,20 @@
+{
+  "name": "@harvest/agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Harvest yield aggregator agent — claims Merkl rewards and auto-compounds via Morpho on World Chain",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "harvest": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@worldcoin/agentkit": "^0.1.6",
+    "viem": "^2.30.2",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

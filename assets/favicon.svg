@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Dark background -->
+  <rect width="32" height="32" rx="6" ry="6" fill="#0a0a0a"/>
+  <!-- >_ prompt, crisp at small size, no glow -->
+  <text x="16" y="22" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace" font-size="16" font-weight="700" fill="#00ff00">&gt;_</text>
+</svg>
