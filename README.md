@@ -103,3 +103,16 @@ Open Harvest in World App → verify human (World ID orb) → `vaults` → `depo
 ## Contracts
 
 Forked from [beefyfinance/beefy-contracts](https://github.com/beefyfinance/beefy-contracts) (MIT licensed, battle-tested, $billions TVL). Modifications: World ID deposit gate, Permit2 transfer path, Uniswap V3 swap routing for World Chain.
+
+## Docs
+
+| Doc | Purpose |
+|-----|---------|
+| [Product Spec](docs/product-spec.md) | Full feature spec — screens, commands, vault logic, demo flow |
+| [Technical Design](docs/technical-design.md) | API routes, contract interfaces, MiniKit integration, agent code |
+| [Contract Spec](docs/contract-spec.md) | BeefyVaultV7 + StrategyMorpho — modifications, interfaces, deployment |
+| [Pitch](docs/pitch.md) | Word-for-word pitch script, demo storyboard, judge Q&A |
+| [Brand Book](docs/brand-book.md) | Visual identity — terminal aesthetic, typography, color, copy tone |
+| [Cloud Architecture](docs/cloud-architecture.md) | Hosting, deployment, agent runtime, infra decisions |
+| [AgentBook Integration](docs/agentbook-integration.md) | How the vault verifies human-backed agents via AgentKit |
+| [Infra Checklist](docs/infra-checklist.md) | Setup tasks — Developer Portal, wallets, Vercel, Supabase |
