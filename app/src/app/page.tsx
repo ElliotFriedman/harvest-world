@@ -83,6 +83,8 @@ export default function Terminal() {
     "",
   ]);
   const [input, setInput] = useState("");
+  const [depositMode, setDepositMode] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [pendingDeposit, setPendingDeposit] = useState<number | null>(null);
   const [idkitOpen, setIdkitOpen] = useState(false);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
@@ -112,12 +114,12 @@ export default function Terminal() {
   async function handleHelp() {
     print(
       "Commands:",
-      "  vaults         — list vaults + APY",
-      "  deposit <n>    — deposit USDC",
-      "  withdraw all   — exit position",
-      "  portfolio      — your balance",
-      "  agent status   — harvester info",
-      "  clear          — clear screen",
+      "  vaults     — list vaults + APY",
+      "  deposit    — deposit USDC",
+      "  withdraw   — exit position",
+      "  portfolio  — your balance",
+      "  agent      — harvester status",
+      "  clear      — clear screen",
       ""
     );
   }
@@ -132,8 +134,6 @@ export default function Terminal() {
         `  APY:    4.23%`,
         `  TVL:    $${tvlFormatted}`,
         `  Status: LIVE`,
-        "",
-        "deposit <amount> to enter",
         ""
       );
     } catch {
@@ -142,27 +142,45 @@ export default function Terminal() {
         "  APY:    4.23%",
         "  TVL:    --",
         "  Status: LIVE",
-        "",
-        "deposit <amount> to enter",
         ""
       );
     }
   }
 
   async function handleDeposit(args: string[]) {
-    const amount = parseFloat(args[0]);
-    if (isNaN(amount) || amount <= 0) {
-      print("Usage: deposit <amount>  (e.g. deposit 50)", "");
-      return;
+    let amount: number;
+
+    if (args[0] === "max") {
+      if (!walletAddress) {
+        print("Connect wallet first.", "");
+        return;
+      }
+      try {
+        const { usdcBalance } = await getBalances(walletAddress);
+        amount = Number(usdcBalance) / 1e6;
+        if (amount <= 0) {
+          print("No USDC balance available.", "");
+          return;
+        }
+      } catch {
+        print("Error: Could not fetch balance.", "");
+        return;
+      }
+    } else {
+      amount = parseFloat(args[0]);
+      if (isNaN(amount) || amount <= 0) {
+        print("Usage: deposit <amount>  (e.g. deposit 50)", "");
+        return;
+      }
     }
 
     if (!MiniKit.isInstalled()) {
-      print("Error: Open this app inside World App.", "");
+      print("Open this app inside World App.", "");
       return;
     }
 
     if (!walletAddress) {
-      print("Connect your wallet first. Tap 'get started' below.", "");
+      print("Connect your wallet first. Tap 'get started'.", "");
       return;
     }
 
@@ -182,7 +200,7 @@ export default function Terminal() {
 
   async function handleWithdraw(args: string[]) {
     if (!MiniKit.isInstalled()) {
-      print("Error: Open this app inside World App.", "");
+      print("Open this app inside World App.", "");
       return;
     }
 
@@ -344,7 +362,7 @@ export default function Terminal() {
             print("Top up your wallet with USDC to deposit.", "");
           } else {
             print(`USDC balance: $${formatBigintUSDC(usdcBalance)}`, "");
-            print("Type 'deposit <amount>' or tap below.", "");
+            print("Tap 'deposit' below to start earning.", "");
           }
         } catch { /* ignore */ }
       }
@@ -403,7 +421,7 @@ export default function Terminal() {
       print(
         `Deposited ${formatUSDC(amount)} USDC.`,
         `  UserOp: ${data.userOpHash.slice(0, 10)}...`,
-        "  Run 'portfolio' to see your position.",
+        "  Tap 'portfolio' to see your position.",
         ""
       );
     } catch (err) {
@@ -437,7 +455,7 @@ export default function Terminal() {
       print(
         "Withdrawal complete.",
         `  UserOp: ${data.userOpHash.slice(0, 10)}...`,
-        "  Run 'portfolio' to see updated position.",
+        "  Tap 'portfolio' to see updated position.",
         ""
       );
     } catch (err) {
@@ -448,47 +466,54 @@ export default function Terminal() {
   // ── Get Started flow ────────────────────────────────────────────────────────
 
   async function handleGetStarted() {
-    if (!MiniKit.isInstalled()) {
-      print("Open this app inside World App.", "");
-      return;
-    }
+    if (isProcessing) return;
+    setIsProcessing(true);
 
-    print("Connecting wallet...");
+    try {
+      if (!MiniKit.isInstalled()) {
+        print("Open this app inside World App.", "");
+        return;
+      }
 
-    let addr = walletAddress;
-    if (!addr) {
-      try {
-        const result = await MiniKit.walletAuth({
-          nonce: crypto.randomUUID().replace(/-/g, ""),
-          statement: "Sign in to Harvest",
-        });
-        if (!result?.data?.address) {
+      print("Connecting wallet...");
+
+      let addr = walletAddress;
+      if (!addr) {
+        try {
+          const result = await MiniKit.walletAuth({
+            nonce: crypto.randomUUID().replace(/-/g, ""),
+            statement: "Sign in to Harvest",
+          });
+          if (!result?.data?.address) {
+            print("Error: wallet connection failed.", "");
+            return;
+          }
+          addr = result.data.address;
+          setWalletAddress(addr);
+          print(`Connected: ${addr.slice(0, 6)}...${addr.slice(-4)}`);
+        } catch {
           print("Error: wallet connection failed.", "");
           return;
         }
-        addr = result.data.address;
-        setWalletAddress(addr);
-        print(`Connected: ${addr.slice(0, 6)}...${addr.slice(-4)}`);
-      } catch {
-        print("Error: wallet connection failed.", "");
-        return;
       }
-    }
 
-    // Open IDKit for World ID verification
-    print("Verifying humanity...");
-    try {
-      const res = await fetch("/api/sign-request");
-      if (!res.ok) throw new Error("Failed to fetch RP signature");
-      const ctx: RpContext = await res.json();
-      setRpContext(ctx);
-      setIdkitOpen(true);
-    } catch {
-      print("Error: Could not start verification.", "");
+      // Open IDKit for World ID verification
+      print("Verifying humanity...");
+      try {
+        const res = await fetch("/api/sign-request");
+        if (!res.ok) throw new Error("Failed to fetch RP signature");
+        const ctx: RpContext = await res.json();
+        setRpContext(ctx);
+        setIdkitOpen(true);
+      } catch {
+        print("Error: Could not start verification.", "");
+      }
+    } finally {
+      setIsProcessing(false);
     }
   }
 
-  // ── Input handling ───────────────────────────────────────────────────────────
+  // ── Input handling (available after wallet connect) ──────────────────────────
 
   async function handleCommand(raw: string) {
     const trimmed = raw.trim().toLowerCase();
@@ -498,24 +523,38 @@ export default function Terminal() {
 
     const [cmd, ...args] = trimmed.split(/\s+/);
 
-    if (cmd === "help") {
-      await handleHelp();
-    } else if (cmd === "vaults") {
-      await handleVaults();
-    } else if (cmd === "deposit") {
-      await handleDeposit(args);
-    } else if (cmd === "withdraw") {
-      await handleWithdraw(args);
-    } else if (cmd === "portfolio") {
-      await handlePortfolio();
-    } else if (cmd === "agent" && args[0] === "status") {
-      await handleAgentStatus();
-    } else if (cmd === "agent" && args[0] === "harvest") {
-      await handleAgentHarvest();
-    } else if (cmd === "clear") {
-      setLines([]);
-    } else {
-      print(`Unknown command: '${cmd}'. Type 'help' for options.`, "");
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      if (cmd === "help") {
+        await handleHelp();
+      } else if (cmd === "vaults") {
+        await handleVaults();
+      } else if (cmd === "deposit") {
+        if (!args[0]) {
+          // No amount typed — show picker
+          setDepositMode(true);
+          print("Select amount:");
+        } else {
+          await handleDeposit(args);
+        }
+      } else if (cmd === "withdraw") {
+        await handleWithdraw(args);
+      } else if (cmd === "portfolio") {
+        await handlePortfolio();
+      } else if (cmd === "agent" && args[0] === "status") {
+        await handleAgentStatus();
+      } else if (cmd === "agent" && args[0] === "harvest") {
+        await handleAgentHarvest();
+      } else if (cmd === "agent") {
+        await handleAgentStatus();
+      } else if (cmd === "clear") {
+        setLines([]);
+      } else {
+        print(`Unknown command: '${cmd}'. Type 'help' for options.`, "");
+      }
+    } finally {
+      setIsProcessing(false);
     }
   }
 
@@ -527,23 +566,146 @@ export default function Terminal() {
     }
   }
 
-  // ── Contextual shortcut buttons ─────────────────────────────────────────────
+  // ── Deposit amount picker (tap flow) ─────────────────────────────────────────
 
-  function getButtons(): { label: string; action: () => void }[] {
+  function onDepositTap() {
+    if (isProcessing) return;
+    setDepositMode(true);
+    print("harvest> deposit", "Select amount:");
+  }
+
+  async function onDepositAmount(amt: number | "max") {
+    setDepositMode(false);
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const label = amt === "max" ? "max" : String(amt);
+    print(`  → $${label}`);
+    try {
+      await handleDeposit([label]);
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  // ── Button style ──────────────────────────────────────────────────────────────
+
+  const btnStyle: React.CSSProperties = {
+    background: "transparent",
+    border: "1px solid #00ff41",
+    color: "#00ff41",
+    fontFamily: "inherit",
+    fontSize: "11px",
+    padding: "4px 10px",
+    cursor: "pointer",
+  };
+
+  const btnDimStyle: React.CSSProperties = {
+    ...btnStyle,
+    opacity: 0.35,
+    cursor: "default",
+  };
+
+  // ── Bottom bar ────────────────────────────────────────────────────────────────
+
+  function renderBottomBar() {
+    // Amount picker — shown when deposit mode active
+    if (depositMode) {
+      return (
+        <div style={{ display: "flex", gap: "8px", paddingTop: "8px", flexWrap: "wrap" }}>
+          {([10, 25, 50, 100] as const).map((amt) => (
+            <button key={amt} onClick={() => onDepositAmount(amt)} style={btnStyle}>
+              ${amt}
+            </button>
+          ))}
+          <button onClick={() => onDepositAmount("max")} style={btnStyle}>MAX</button>
+          <button
+            onClick={() => { setDepositMode(false); print("Cancelled.", ""); }}
+            style={btnStyle}
+          >
+            cancel
+          </button>
+        </div>
+      );
+    }
+
+    // Pre-connect: no keyboard, buttons only
     if (!walletAddress || !isVerified) {
-      return [{ label: "get started", action: handleGetStarted }];
+      return (
+        <div style={{ display: "flex", gap: "8px", paddingTop: "8px", flexWrap: "wrap" }}>
+          <button
+            onClick={handleGetStarted}
+            style={isProcessing ? btnDimStyle : btnStyle}
+            disabled={isProcessing}
+          >
+            get started
+          </button>
+          <button
+            onClick={() => { if (!isProcessing) { setIsProcessing(true); handleVaults().finally(() => setIsProcessing(false)); } }}
+            style={isProcessing ? btnDimStyle : btnStyle}
+            disabled={isProcessing}
+          >
+            vaults
+          </button>
+          <button
+            onClick={() => { if (!isProcessing) { setIsProcessing(true); handleHelp().finally(() => setIsProcessing(false)); } }}
+            style={isProcessing ? btnDimStyle : btnStyle}
+            disabled={isProcessing}
+          >
+            help
+          </button>
+        </div>
+      );
     }
-    if (hasShares) {
-      return [
-        { label: "deposit", action: () => handleCommand("deposit 50") },
-        { label: "portfolio", action: () => handleCommand("portfolio") },
-        { label: "withdraw all", action: () => handleCommand("withdraw all") },
-      ];
-    }
-    return [
-      { label: "deposit", action: () => handleCommand("deposit 50") },
-      { label: "portfolio", action: () => handleCommand("portfolio") },
-    ];
+
+    // Post-connect + verified: full command bar
+    return (
+      <div style={{ display: "flex", gap: "8px", paddingTop: "8px", flexWrap: "wrap" }}>
+        <button
+          onClick={() => handleCommand("vaults")}
+          style={isProcessing ? btnDimStyle : btnStyle}
+          disabled={isProcessing}
+        >
+          vaults
+        </button>
+        <button
+          onClick={() => handleCommand("portfolio")}
+          style={isProcessing ? btnDimStyle : btnStyle}
+          disabled={isProcessing}
+        >
+          portfolio
+        </button>
+        <button
+          onClick={onDepositTap}
+          style={isProcessing ? btnDimStyle : btnStyle}
+          disabled={isProcessing}
+        >
+          deposit
+        </button>
+        {hasShares && (
+          <button
+            onClick={() => handleCommand("withdraw all")}
+            style={isProcessing ? btnDimStyle : btnStyle}
+            disabled={isProcessing}
+          >
+            withdraw
+          </button>
+        )}
+        <button
+          onClick={() => handleCommand("agent")}
+          style={isProcessing ? btnDimStyle : btnStyle}
+          disabled={isProcessing}
+        >
+          agent
+        </button>
+        <button
+          onClick={() => handleCommand("help")}
+          style={isProcessing ? btnDimStyle : btnStyle}
+          disabled={isProcessing}
+        >
+          help
+        </button>
+      </div>
+    );
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -557,7 +719,7 @@ export default function Terminal() {
         padding: "10px",
         overflow: "hidden",
       }}
-      onClick={() => inputRef.current?.focus()}
+      onClick={() => walletAddress ? inputRef.current?.focus() : undefined}
     >
       <div
         style={{
@@ -573,56 +735,37 @@ export default function Terminal() {
         <div ref={bottomRef} />
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          paddingTop: "8px",
-          flexWrap: "wrap",
-        }}
-      >
-        {getButtons().map((btn) => (
-          <button
-            key={btn.label}
-            onClick={btn.action}
+      {renderBottomBar()}
+
+      {/* Text input — only shown after wallet connect */}
+      {walletAddress ? (
+        <div style={{ display: "flex", alignItems: "center", paddingTop: "6px" }}>
+          <span style={{ marginRight: "8px" }}>harvest&gt;</span>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
             style={{
+              flex: 1,
               background: "transparent",
-              border: "1px solid #00ff41",
+              border: "none",
+              outline: "none",
               color: "#00ff41",
               fontFamily: "inherit",
-              fontSize: "11px",
-              padding: "4px 8px",
-              cursor: "pointer",
+              fontSize: "inherit",
+              caretColor: "#00ff41",
             }}
-          >
-            {btn.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", paddingTop: "6px" }}>
-        <span style={{ marginRight: "8px" }}>harvest&gt;</span>
-        <input
-          ref={inputRef}
-          autoFocus
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          style={{
-            flex: 1,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: "#00ff41",
-            fontFamily: "inherit",
-            fontSize: "inherit",
-            caretColor: "#00ff41",
-          }}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-        />
-      </div>
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+          />
+        </div>
+      ) : (
+        <div style={{ paddingTop: "6px", opacity: 0.4, userSelect: "none" }}>
+          harvest&gt; ▌
+        </div>
+      )}
 
       {/* IDKit v4 widget — backend verification only, no on-chain verifyHuman */}
       {rpContext && walletAddress && (
