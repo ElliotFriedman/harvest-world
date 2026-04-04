@@ -1,6 +1,9 @@
 # Normalize text files to LF in the repository (checkout + commit).
 * text=auto eol=lf
 
+# Certora & similar spec files — force text + LF (explicit; also covered by * above)
+*.spec text eol=lf
+
 # Binary assets — do not apply line-ending conversion
 *.png binary
 *.jpg binary
