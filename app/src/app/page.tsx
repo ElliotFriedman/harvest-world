@@ -78,7 +78,7 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v1.8 — Agentic DeFi, for humans.",
+    "HARVEST v1.9 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
@@ -372,8 +372,8 @@ export default function Terminal() {
     try {
       const amountRaw = BigInt(Math.floor(amount * 1e6));
 
-      // Permit2: current timestamp, no padding — strict > check means same-second passes
-      const expiration = Math.floor(Date.now() / 1000);
+      // Permit2: 2s padding — strict > check means same-block passes
+      const expiration = Math.floor(Date.now() / 1000) + 2;
       const approveCalldata = encodeFunctionData({
         abi: PERMIT2_APPROVE_ABI,
         functionName: "approve",
