@@ -80,8 +80,8 @@ methods {
     function _.transferFrom(address, address, uint256)        external => DISPATCHER(true);
     function _.balanceOf(address)                             external => DISPATCHER(true);
     function _.approve(address, uint256)                      external => DISPATCHER(true);
-    function _.forceApprove(address, uint256)                 external => DISPATCHER(true);
-    function _.decimals()                                     external => DISPATCHER(true);
+    function _.forceApprove(address, uint256)                 external => NONDET;
+    function _.decimals()                                     external => NONDET;
 
     // ---------- Router summary ------------------------------------------------
     // The router is called via a low-level `router.call(data)`.  In CVL2,
@@ -103,11 +103,11 @@ ghost uint256 ghostSlippage {
     init_state axiom ghostSlippage == 0;
 }
 
-hook Sstore slippage uint256 newVal STORAGE {
+hook Sstore slippage uint256 newVal {
     ghostSlippage = newVal;
 }
 
-hook Sload uint256 val slippage STORAGE {
+hook Sload uint256 val slippage {
     require ghostSlippage == val;
 }
 
@@ -278,11 +278,12 @@ rule swapDoesNotChangeCallerBalanceOnRevert(
     uint256 callerBalBefore = tokenBalanceOf(fromToken, e.msg.sender);
 
     swapper.swap@withrevert(e, fromToken, toToken, amountIn, minAmountOut);
+    bool swapReverted = lastReverted;
 
     uint256 callerBalAfter = tokenBalanceOf(fromToken, e.msg.sender);
 
     // If the call reverted, the caller's balance must be unchanged.
-    assert lastReverted => (callerBalAfter == callerBalBefore),
+    assert swapReverted => (callerBalAfter == callerBalBefore),
         "A reverted swap must not change the caller's fromToken balance";
 }
 

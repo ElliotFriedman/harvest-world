@@ -119,7 +119,7 @@ ghost mathint ghostTotalLocked {
     init_state axiom ghostTotalLocked == 0;
 }
 
-hook Sstore totalLocked uint256 newVal (uint256 oldVal) STORAGE {
+hook Sstore totalLocked uint256 newVal (uint256 oldVal) {
     ghostTotalLocked = ghostTotalLocked + (newVal - oldVal);
 }
 
@@ -128,7 +128,7 @@ ghost mathint ghostLastHarvest {
     init_state axiom ghostLastHarvest == 0;
 }
 
-hook Sstore lastHarvest uint256 newVal (uint256 oldVal) STORAGE {
+hook Sstore lastHarvest uint256 newVal (uint256 oldVal) {
     ghostLastHarvest = ghostLastHarvest + (newVal - oldVal);
 }
 

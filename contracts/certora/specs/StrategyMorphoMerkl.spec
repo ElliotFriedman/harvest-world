@@ -100,16 +100,14 @@ methods {
     // ---------- MockMerklClaimer surface (concrete, linked) -----------------
     function merklClaimer.claimCallCount()   external returns (uint256) envfree;
 
-    // ---------- Generic ERC-20 summaries -------------------------------------
+    // ---------- Generic ERC-20 summaries (DISPATCHER for linked contracts) ---
     function _.transfer(address, uint256)              external => DISPATCHER(true);
     function _.transferFrom(address, address, uint256) external => DISPATCHER(true);
     function _.balanceOf(address)                      external => DISPATCHER(true);
     function _.approve(address, uint256)               external => DISPATCHER(true);
     function _.forceApprove(address, uint256)          external => DISPATCHER(true);
 
-    // ---------- Morpho vault summaries (used when morpho is not linked) ------
-    // When rules use the DISPATCHER the prover picks the concrete mock.
-    // The generic wildcard summaries are only active for OTHER contracts.
+    // ---------- Morpho vault summaries (DISPATCHER for linked resolution) ----
     function _.convertToAssets(uint256) external => DISPATCHER(true);
     function _.deposit(uint256, address) external => DISPATCHER(true);
     function _.withdraw(uint256, address, address) external => DISPATCHER(true);
@@ -141,7 +139,7 @@ ghost mathint ghostClaimCallCount {
 // (Storage layout: claimCallCount is the third slot after two address[] arrays.)
 // In practice the Certora harness exposes claimCallCount() as a view — the
 // ghost is a belt-and-suspenders cross-check.
-hook Sstore merklClaimer.claimCallCount uint256 newVal (uint256 oldVal) STORAGE {
+hook Sstore merklClaimer.claimCallCount uint256 newVal (uint256 oldVal) {
     ghostClaimCallCount = ghostClaimCallCount + (newVal - oldVal);
 }
 
@@ -234,6 +232,15 @@ rule balanceOfPoolMatchesMorpho() {
     // Constrain linked contracts so DISPATCHER resolves correctly
     require strat.morphoVault() == morpho;
     require strat.want() == wantToken;
+    require strat.claimer() == merklClaimer;
+
+    // Ensure all contracts are at distinct addresses
+    require strat != morpho;
+    require strat != wantToken;
+    require strat != merklClaimer;
+    require morpho != wantToken;
+    require morpho != merklClaimer;
+    require wantToken != merklClaimer;
 
     uint256 stratShares = morpho.balanceOf(strat);
     uint256 expectedAssets = morpho.convertToAssets(stratShares);
