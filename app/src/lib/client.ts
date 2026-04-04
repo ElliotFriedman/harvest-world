@@ -28,3 +28,43 @@ export async function getVaultTvl(): Promise<bigint> {
   const data = await res.json();
   return BigInt(data.tvl);
 }
+
+// ─── Agent / Harvester ──────────────────────────────────────────────────────
+
+export type { HarvestRecord } from "./harvester";
+
+export interface AgentStatus {
+  status: "active" | "idle";
+  lastHarvest: import("./harvester").HarvestRecord | null;
+  harvests: import("./harvester").HarvestRecord[];
+  pendingRewards: { token: string; amount: string; usdValue: number } | null;
+  nextCheck: string;
+  balanceOfPool?: string;
+}
+
+export interface HarvestResult {
+  success: boolean;
+  txHash?: string;
+  claimTxHash?: string;
+  rewardsClaimed?: string;
+  wantEarned?: string;
+  newSharePrice?: string;
+  oldSharePrice?: string;
+  reason?: string;
+  message?: string;
+}
+
+export async function getAgentStatus(): Promise<AgentStatus> {
+  const res = await fetch("/api/agent/status");
+  if (!res.ok) throw new Error("Failed to fetch agent status");
+  return res.json();
+}
+
+export async function triggerHarvest(): Promise<HarvestResult> {
+  const res = await fetch("/api/agent/harvest", { method: "POST" });
+  try {
+    return await res.json();
+  } catch {
+    return { success: false, reason: "tx_failed", message: `HTTP ${res.status}` };
+  }
+}
