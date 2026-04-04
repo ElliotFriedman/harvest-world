@@ -112,11 +112,7 @@ export default function Terminal() {
   async function typewriterPrint(text: string, delayMs = 28): Promise<void> {
     setLines((prev) => [...prev, ""]);
     for (let i = 1; i <= text.length; i++) {
-<<<<<<< HEAD
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-=======
       await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
->>>>>>> adbe943ef85c31391f0596345a28e3d0135128f2
       setLines((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = text.slice(0, i);
