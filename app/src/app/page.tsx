@@ -102,7 +102,7 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v1.1 — Agentic DeFi, for humans.",
+    "HARVEST v1.2 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
@@ -110,8 +110,10 @@ export default function Terminal() {
   const [pendingDeposit, setPendingDeposit] = useState<number | null>(null);
   const [idkitOpen, setIdkitOpen] = useState(false);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
+  const [currentPreset, setCurrentPreset] = useState<ReturnType<typeof orbLegacy> | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
+  const [hasShares, setHasShares] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -120,30 +122,12 @@ export default function Terminal() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
 
-  // Connect wallet via MiniKit on mount
+  // Check for cached wallet address on mount (no auto-auth)
   useEffect(() => {
-    async function connect() {
-      if (!MiniKit.isInstalled()) return;
-
-      // If already authed, use cached address
-      if (MiniKit.user?.walletAddress) {
-        setWalletAddress(MiniKit.user.walletAddress);
-        return;
-      }
-
-      try {
-        const result = await MiniKit.walletAuth({
-          nonce: crypto.randomUUID().replace(/-/g, ""),
-          statement: "Sign in to Harvest",
-        });
-        if (result?.data?.address) {
-          setWalletAddress(result.data.address);
-        }
-      } catch {
-        // User rejected or MiniKit not ready — silently continue
-      }
+    if (!MiniKit.isInstalled()) return;
+    if (MiniKit.user?.walletAddress) {
+      setWalletAddress(MiniKit.user.walletAddress);
     }
-    connect();
   }, []);
 
   const print = useCallback((...newLines: string[]) => {
@@ -172,9 +156,9 @@ export default function Terminal() {
       const tvlFormatted = formatBigintUSDC(tvl);
       print(
         "USDC (Re7 Morpho)",
-        `  APY:    4.23%`,
+        "  APY:    4.23%",
         `  TVL:    $${tvlFormatted}`,
-        `  Status: LIVE`,
+        "  Status: LIVE",
         "",
         "deposit <amount> to enter",
         ""
@@ -205,7 +189,7 @@ export default function Terminal() {
     }
 
     if (!walletAddress) {
-      print("Connect your wallet first. Tap 'connect wallet' below.", "");
+      print("Connect your wallet first. Tap 'get started' below.", "");
       return;
     }
 
@@ -215,7 +199,6 @@ export default function Terminal() {
         "World ID verification required first — opening IDKit...",
         ""
       );
-      print(`Signal (wallet): ${walletAddress}`);
       setPendingDeposit(amount);
       await openIdkit();
       return;
@@ -309,6 +292,9 @@ export default function Terminal() {
     try {
       const { usdcBalance, vaultShares, pricePerShare } = await getBalances(walletAddress);
 
+      // Update hasShares state for button context
+      if (vaultShares > BigInt(0)) setHasShares(true);
+
       // Calculate USD value of vault shares
       const usdValue = (vaultShares * pricePerShare) / BigInt(1e18);
 
@@ -349,11 +335,18 @@ export default function Terminal() {
   // ── IDKit flow ───────────────────────────────────────────────────────────────
 
   async function openIdkit() {
+    if (!walletAddress) {
+      print("Error: Wallet must be connected before verification.", "");
+      setPendingDeposit(null);
+      return;
+    }
+
     try {
       const res = await fetch("/api/sign-request");
       if (!res.ok) throw new Error("Failed to fetch RP signature");
       const ctx: RpContext = await res.json();
       setRpContext(ctx);
+      setCurrentPreset(orbLegacy({ signal: walletAddress }));
       setIdkitOpen(true);
     } catch {
       print("Error: Could not initialize World ID verification.", "");
@@ -384,18 +377,11 @@ export default function Terminal() {
       }
 
       try {
-        // Debug: show raw result structure
-        print(`IDKit result keys: ${JSON.stringify(Object.keys(result))}`);
-        print(`Responses count: ${result.responses?.length ?? "undefined"}`);
-
         const response = result.responses[0];
         if (!response) {
           print("Error: No credential response from World ID.", "");
-          print(`Full result: ${JSON.stringify(result).slice(0, 200)}`);
           return;
         }
-
-        print(`Response keys: ${JSON.stringify(Object.keys(response))}`);
 
         let root: bigint;
         let nullifierHash: bigint;
@@ -408,7 +394,6 @@ export default function Terminal() {
           nullifierHash = BigInt(v3.nullifier);
           const decoded = decodeProof(v3.proof);
           proofArray = decoded.map((d) => BigInt(d)) as unknown as typeof proofArray;
-          print(`V3 format — root: ${root.toString().slice(0, 10)}...`);
         } else if ("nullifier" in response) {
           const v4 = response as ResponseItemV4;
           root = BigInt(v4.proof[4]);
@@ -416,10 +401,8 @@ export default function Terminal() {
           const elements = v4.proof.slice(0, 4).map((p) => BigInt(p));
           while (elements.length < 8) elements.push(BigInt(0));
           proofArray = elements as unknown as typeof proofArray;
-          print(`V4 format — root: ${root.toString().slice(0, 10)}...`);
         } else {
           print("Error: Unsupported proof format.", "");
-          print(`Response: ${JSON.stringify(response).slice(0, 200)}`);
           return;
         }
 
@@ -439,8 +422,6 @@ export default function Terminal() {
           ],
         });
 
-        print(`sendTransaction result: ${JSON.stringify(data).slice(0, 200)}`);
-
         if (data.status !== "success") {
           print(`Error: tx failed — status=${data.status}`, "");
           return;
@@ -451,6 +432,23 @@ export default function Terminal() {
           `Verified. UserOp: ${data.userOpHash.slice(0, 10)}...`,
           ""
         );
+
+        // Auto-fetch balance after verification
+        const addr = walletAddress;
+        if (addr) {
+          try {
+            const { usdcBalance, vaultShares } = await getBalances(addr);
+            if (vaultShares > BigInt(0)) setHasShares(true);
+            if (usdcBalance === BigInt(0)) {
+              print("Top up your wallet with USDC to deposit.", "");
+            } else {
+              print(`USDC balance: $${formatBigintUSDC(usdcBalance)}`, "");
+              print("Type 'deposit <amount>' or tap below.", "");
+            }
+          } catch {
+            /* ignore balance fetch errors */
+          }
+        }
 
         // If a deposit was waiting, execute it now
         if (pendingDeposit !== null) {
@@ -465,7 +463,7 @@ export default function Terminal() {
         );
       }
     },
-    [pendingDeposit, print]
+    [pendingDeposit, print, walletAddress]
   );
 
   // ── Transaction executors ──────────────────────────────────────────────────
@@ -521,6 +519,7 @@ export default function Terminal() {
         return;
       }
 
+      setHasShares(true);
       print(
         `Deposited ${formatUSDC(amount)} USDC.`,
         `  UserOp: ${data.userOpHash.slice(0, 10)}...`,
@@ -577,6 +576,51 @@ export default function Terminal() {
     }
   }
 
+  // ── Get Started flow ────────────────────────────────────────────────────────
+
+  async function handleGetStarted() {
+    if (!MiniKit.isInstalled()) {
+      print("Open this app inside World App.", "");
+      return;
+    }
+
+    print("Connecting wallet...");
+
+    // Step 1: walletAuth
+    let addr = walletAddress;
+    if (!addr) {
+      try {
+        const result = await MiniKit.walletAuth({
+          nonce: crypto.randomUUID().replace(/-/g, ""),
+          statement: "Sign in to Harvest",
+        });
+        if (!result?.data?.address) {
+          print("Error: wallet connection failed.", "");
+          return;
+        }
+        addr = result.data.address;
+        setWalletAddress(addr);
+        print(`Connected: ${addr.slice(0, 6)}...${addr.slice(-4)}`);
+      } catch {
+        print("Error: wallet connection failed.", "");
+        return;
+      }
+    }
+
+    // Step 2: immediately open IDKit for World ID verification
+    print("Verifying humanity...");
+    try {
+      const res = await fetch("/api/sign-request");
+      if (!res.ok) throw new Error("Failed to fetch RP signature");
+      const ctx: RpContext = await res.json();
+      setRpContext(ctx);
+      setCurrentPreset(orbLegacy({ signal: addr }));
+      setIdkitOpen(true);
+    } catch {
+      print("Error: Could not start verification.", "");
+    }
+  }
+
   // ── Input handling ───────────────────────────────────────────────────────────
 
   async function handleCommand(raw: string) {
@@ -619,36 +663,20 @@ export default function Terminal() {
   // ── Contextual shortcut buttons ─────────────────────────────────────────────
 
   function getButtons(): { label: string; action: () => void }[] {
-    if (!walletAddress) {
-      return [{ label: "connect wallet", action: () => {
-        async function connect() {
-          try {
-            const result = await MiniKit.walletAuth({
-              nonce: crypto.randomUUID().replace(/-/g, ""),
-              statement: "Sign in to Harvest",
-            });
-            if (result?.data?.address) {
-              setWalletAddress(result.data.address);
-              print(`Connected: ${result.data.address.slice(0, 6)}...${result.data.address.slice(-4)}`, "");
-            }
-          } catch {
-            print("Error: Could not connect wallet.", "");
-          }
-        }
-        connect();
-      }}];
+    if (!walletAddress || !isVerified) {
+      return [{ label: "get started", action: handleGetStarted }];
     }
-    if (!isVerified) {
+    // Verified — show contextual buttons
+    if (hasShares) {
       return [
-        { label: "vaults", action: () => handleCommand("vaults") },
-        { label: "deposit 50", action: () => handleCommand("deposit 50") },
-        { label: "help", action: () => handleCommand("help") },
+        { label: "deposit", action: () => handleCommand("deposit 50") },
+        { label: "portfolio", action: () => handleCommand("portfolio") },
+        { label: "withdraw all", action: () => handleCommand("withdraw all") },
       ];
     }
     return [
-      { label: "deposit 50", action: () => handleCommand("deposit 50") },
+      { label: "deposit", action: () => handleCommand("deposit 50") },
       { label: "portfolio", action: () => handleCommand("portfolio") },
-      { label: "withdraw all", action: () => handleCommand("withdraw all") },
     ];
   }
 
@@ -733,14 +761,14 @@ export default function Terminal() {
         />
       </div>
 
-      {/* IDKit widget — rendered but only opened when needed */}
-      {rpContext && (
+      {/* IDKit widget — only rendered when preset and wallet are fresh */}
+      {rpContext && currentPreset && walletAddress && (
         <IDKitRequestWidget
           app_id={APP_ID}
           action="verify-human"
           rp_context={rpContext}
           allow_legacy_proofs={true}
-          preset={orbLegacy({ signal: walletAddress ?? undefined })}
+          preset={currentPreset}
           open={idkitOpen}
           onOpenChange={setIdkitOpen}
           handleVerify={handleVerify}
