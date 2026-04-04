@@ -8,7 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
-    "@worldcoin/idkit": "^2.4.2",
+    "@worldcoin/idkit": "^4.0.11",
+    "@worldcoin/idkit-server": "^1.1.0",
     "@worldcoin/minikit-js": "^2.0.2",
     "next": "^16.2.2",
     "react": "18.3.1",

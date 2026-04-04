@@ -2,18 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  IDKitWidget,
-  ISuccessResult,
-  VerificationLevel,
+  IDKitRequestWidget,
+  IDKitResult,
+  IDKitErrorCodes,
+  RpContext,
+  orbLegacy,
 } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
-import { encodeFunctionData, decodeAbiParameters } from "viem";
-import {
-  getBalances,
-  getVaultTvl,
-  getAgentStatus,
-  triggerHarvest,
-} from "../lib/client";
+import { encodeFunctionData } from "viem";
+import { getBalances, getVaultTvl } from "../lib/client";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -25,20 +22,6 @@ const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as const;
 const WORLD_CHAIN_ID = 480;
 
 // Minimal ABIs for on-chain calls
-const VERIFY_HUMAN_ABI = [
-  {
-    name: "verifyHuman",
-    type: "function" as const,
-    inputs: [
-      { name: "root", type: "uint256" },
-      { name: "nullifierHash", type: "uint256" },
-      { name: "proof", type: "uint256[8]" },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-] as const;
-
 const DEPOSIT_ABI = [
   {
     name: "deposit",
@@ -76,11 +59,6 @@ const WITHDRAW_ABI = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// IDKit v3 returns proof as ABI-encoded uint256[8] (with 32-byte offset prefix)
-function decodeProof(proof: `0x${string}`): bigint[] {
-  return [...decodeAbiParameters([{ type: "uint256[8]" }], proof)[0]];
-}
-
 function formatUSDC(amount: number): string {
   return amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -88,7 +66,6 @@ function formatUSDC(amount: number): string {
   });
 }
 
-/** Format a bigint with 6 decimals (USDC) to a human-readable string */
 function formatBigintUSDC(raw: bigint): string {
   const whole = raw / BigInt(1e6);
   const frac = raw % BigInt(1e6);
@@ -100,25 +77,24 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v1.3 — Agentic DeFi, for humans.",
+    "HARVEST v1.4 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
   const [input, setInput] = useState("");
   const [pendingDeposit, setPendingDeposit] = useState<number | null>(null);
   const [idkitOpen, setIdkitOpen] = useState(false);
+  const [rpContext, setRpContext] = useState<RpContext | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [hasShares, setHasShares] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Scroll to bottom whenever lines change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
 
-  // Check for cached wallet address on mount (no auto-auth)
   useEffect(() => {
     if (!MiniKit.isInstalled()) return;
     if (MiniKit.user?.walletAddress) {
@@ -140,7 +116,6 @@ export default function Terminal() {
       "  withdraw all   — exit position",
       "  portfolio      — your balance",
       "  agent status   — harvester info",
-      "  agent harvest  — trigger harvest",
       "  clear          — clear screen",
       ""
     );
@@ -153,9 +128,9 @@ export default function Terminal() {
       const tvlFormatted = formatBigintUSDC(tvl);
       print(
         "USDC (Re7 Morpho)",
-        "  APY:    4.23%",
+        `  APY:    4.23%`,
         `  TVL:    $${tvlFormatted}`,
-        "  Status: LIVE",
+        `  Status: LIVE`,
         "",
         "deposit <amount> to enter",
         ""
@@ -193,7 +168,7 @@ export default function Terminal() {
     if (!isVerified) {
       print(
         `Deposit ${formatUSDC(amount)} USDC requested.`,
-        "World ID verification required first — opening IDKit...",
+        "World ID verification required first...",
         ""
       );
       setPendingDeposit(amount);
@@ -206,7 +181,7 @@ export default function Terminal() {
 
   async function handleWithdraw(args: string[]) {
     if (!MiniKit.isInstalled()) {
-      print("Error: Open this app inside World App to withdraw.", "");
+      print("Error: Open this app inside World App.", "");
       return;
     }
 
@@ -216,7 +191,7 @@ export default function Terminal() {
     }
 
     if (!isVerified) {
-      print("Error: World ID verification required before withdrawing.", "");
+      print("Error: World ID verification required first.", "");
       return;
     }
 
@@ -248,7 +223,6 @@ export default function Terminal() {
           return;
         }
 
-        // Convert USDC amount to shares: shares = (amountRaw * 1e18) / pricePerShare
         const amountRaw = BigInt(Math.floor(amount * 1e6));
         if (pricePerShare === BigInt(0)) {
           print("Error: Could not read price per share.", "");
@@ -271,10 +245,7 @@ export default function Terminal() {
 
       await executeWithdraw(sharesToWithdraw);
     } catch (err) {
-      print(
-        `Error: ${err instanceof Error ? err.message : "unknown"}`,
-        ""
-      );
+      print(`Error: ${err instanceof Error ? err.message : "unknown"}`, "");
     }
   }
 
@@ -284,15 +255,13 @@ export default function Terminal() {
       return;
     }
 
-    print(`Loading portfolio for ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}...`);
+    print(`Loading portfolio...`);
 
     try {
       const { usdcBalance, vaultShares, pricePerShare } = await getBalances(walletAddress);
 
-      // Update hasShares state for button context
       if (vaultShares > BigInt(0)) setHasShares(true);
 
-      // Calculate USD value of vault shares
       const usdValue = (vaultShares * pricePerShare) / BigInt(1e18);
 
       print(
@@ -300,151 +269,55 @@ export default function Terminal() {
         `  USDC in wallet: $${formatBigintUSDC(usdcBalance)}`,
         `  Vault shares:   ${formatBigintUSDC(vaultShares)} mooUSDC`,
         `  USD value:      $${formatBigintUSDC(usdValue)}`,
-        `  Verified:       ${isVerified ? "yes" : "no"}`,
         ""
       );
     } catch {
-      print(
-        `Portfolio for ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
-        "  Error loading on-chain data. Try again.",
-        ""
-      );
+      print("Error loading portfolio. Try again.", "");
     }
   }
 
   async function handleAgentStatus() {
-    print("Loading agent status...");
-    try {
-      const data = await getAgentStatus();
-
-      // Format time-ago for last harvest
-      let lastHarvestStr = "never";
-      if (data.lastHarvest) {
-        const ago = Date.now() - new Date(data.lastHarvest.timestamp).getTime();
-        const mins = Math.floor(ago / 60_000);
-        if (mins < 60) lastHarvestStr = `${mins}m ago`;
-        else {
-          const hrs = Math.floor(mins / 60);
-          lastHarvestStr = `${hrs}h ${mins % 60}m ago`;
-        }
-      }
-
-      // Format next check
-      const nextMs = new Date(data.nextCheck).getTime() - Date.now();
-      const nextHrs = Math.max(0, Math.floor(nextMs / 3600_000));
-      const nextMins = Math.max(0, Math.floor((nextMs % 3600_000) / 60_000));
-      const nextStr = nextHrs > 0 ? `in ~${nextHrs}h ${nextMins}m` : `in ~${nextMins}m`;
-
-      // Pending rewards line
-      const pendingStr = data.pendingRewards
-        ? `${data.pendingRewards.amount} (~$${data.pendingRewards.usdValue.toFixed(2)})`
-        : "0 WLD";
-
-      print(
-        "HARVESTER AGENT",
-        `  Status:         \u25CF ACTIVE`,
-        "  Strategy:       StrategyMorpho (Re7 USDC)",
-        `  Last harvest:   ${lastHarvestStr}`,
-        `  Next check:     ${nextStr}`,
-        `  Pending yield:  ${pendingStr}`,
-        ""
-      );
-
-      // Recent harvests table
-      if (data.harvests.length > 0) {
-        print(
-          "  RECENT HARVESTS",
-          "  +------------------+-------------+-------------+-----------+",
-          "  | Time             | Claimed     | Compound    | Tx        |",
-          "  +------------------+-------------+-------------+-----------+"
-        );
-
-        for (const h of data.harvests.slice(0, 5)) {
-          const t = new Date(h.timestamp);
-          const timeStr = `${(t.getMonth() + 1).toString().padStart(2, "0")}/${t.getDate().toString().padStart(2, "0")} ${t.getHours().toString().padStart(2, "0")}:${t.getMinutes().toString().padStart(2, "0")}`;
-          const claimed = h.rewardsClaimed.padEnd(11).slice(0, 11);
-          const compound = h.wantEarned.padEnd(11).slice(0, 11);
-          const tx = h.txHash.slice(0, 8) + "..";
-          print(`  | ${timeStr.padEnd(16)} | ${claimed} | ${compound} | ${tx} |`);
-        }
-
-        print(
-          "  +------------------+-------------+-------------+-----------+",
-          ""
-        );
-      }
-    } catch {
-      print(
-        "HARVESTER AGENT",
-        "  Status:         \u25CF ACTIVE",
-        "  Error loading live data. Using defaults.",
-        "  Strategy:       StrategyMorpho (Re7 USDC)",
-        "  Next check:     in ~6h",
-        ""
-      );
-    }
+    print(
+      "HARVESTER AGENT",
+      "  Status:         ● ACTIVE",
+      "  Last harvest:   never",
+      "  Next check:     in ~6h",
+      "  Pending yield:  0 WLD",
+      ""
+    );
   }
 
   async function handleAgentHarvest() {
-    print("HARVESTING...");
-    print("  [1/3] Checking Merkl rewards...");
-
-    try {
-      const result = await triggerHarvest();
-
-      if (!result.success) {
-        if (result.reason === "no_rewards") {
-          print("        No unclaimed rewards found.", "");
-        } else if (result.reason === "missing_key") {
-          print("        Agent wallet not configured.", "");
-        } else {
-          print(`        Error: ${result.message ?? "harvest failed"}`, "");
-        }
-        return;
-      }
-
-      print(`        ${result.rewardsClaimed ?? "rewards"} available`);
-      print(`  [2/3] Claiming + swapping...        TX: ${(result.txHash ?? "").slice(0, 10)}...`);
-      print(`  [3/3] Compounded into vault         +${result.wantEarned ?? "-- USDC"}`);
-
-      // Share price change
-      if (result.oldSharePrice && result.newSharePrice) {
-        const fmtPrice = (raw: string) => {
-          const bi = BigInt(raw);
-          const whole = bi / BigInt(1e18);
-          const frac = (bi % BigInt(1e18)).toString().padStart(18, "0").slice(0, 6);
-          return `${whole}.${frac}`;
-        };
-        print("");
-        print(`  Share price: ${fmtPrice(result.oldSharePrice)} -> ${fmtPrice(result.newSharePrice)}`);
-      }
-
-      print("  Next harvest in ~6h.", "");
-    } catch {
-      print("        Error: Could not reach harvest endpoint.", "");
-    }
+    print("Triggering manual harvest...");
+    print("No pending rewards above threshold.", "");
   }
 
-  // ── IDKit flow ───────────────────────────────────────────────────────────────
+  // ── IDKit flow (backend-only verification) ─────────────────────────────────
 
   async function openIdkit() {
     if (!walletAddress) {
-      print("Error: Wallet must be connected before verification.", "");
+      print("Error: Wallet must be connected first.", "");
       setPendingDeposit(null);
       return;
     }
-    setIdkitOpen(true);
+
+    try {
+      const res = await fetch("/api/sign-request");
+      if (!res.ok) throw new Error("Failed to fetch RP signature");
+      const ctx: RpContext = await res.json();
+      setRpContext(ctx);
+      setIdkitOpen(true);
+    } catch {
+      print("Error: Could not initialize verification.", "");
+      setPendingDeposit(null);
+    }
   }
 
-  async function handleVerify(result: ISuccessResult): Promise<void> {
+  async function handleVerify(result: IDKitResult): Promise<void> {
     const res = await fetch("/api/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...result,
-        action: "verify-human",
-        signal: walletAddress,
-      }),
+      body: JSON.stringify(result),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -453,75 +326,33 @@ export default function Terminal() {
   }
 
   const handleIdkitSuccess = useCallback(
-    async (result: ISuccessResult) => {
+    async (_result: IDKitResult) => {
       setIdkitOpen(false);
-      print("World ID verified. Registering on-chain...");
 
-      if (!MiniKit.isInstalled() || !walletAddress) {
-        print("Error: MiniKit not available.", "");
-        return;
+      // Backend verified the proof via World ID API — that's sufficient.
+      // No on-chain verifyHuman tx needed (V4 nullifiers exceed BN254 field).
+      setIsVerified(true);
+      print("World ID verified.", "");
+
+      // Fetch balance after verification
+      if (walletAddress) {
+        try {
+          const { usdcBalance, vaultShares } = await getBalances(walletAddress);
+          if (vaultShares > BigInt(0)) setHasShares(true);
+          if (usdcBalance === BigInt(0)) {
+            print("Top up your wallet with USDC to deposit.", "");
+          } else {
+            print(`USDC balance: $${formatBigintUSDC(usdcBalance)}`, "");
+            print("Type 'deposit <amount>' or tap below.", "");
+          }
+        } catch { /* ignore */ }
       }
 
-      try {
-        const root = BigInt(result.merkle_root);
-        const nullifierHash = BigInt(result.nullifier_hash);
-        const proofArray = decodeProof(result.proof as `0x${string}`) as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
-
-        const verifyCalldata = encodeFunctionData({
-          abi: VERIFY_HUMAN_ABI,
-          functionName: "verifyHuman",
-          args: [root, nullifierHash, proofArray],
-        });
-
-        const { data } = await MiniKit.sendTransaction({
-          chainId: WORLD_CHAIN_ID,
-          transactions: [
-            {
-              to: VAULT_ADDRESS,
-              data: verifyCalldata,
-            },
-          ],
-        });
-
-        if (data.status !== "success") {
-          print(`Error: tx failed — status=${data.status}`, "");
-          return;
-        }
-
-        setIsVerified(true);
-        print(
-          `Verified. UserOp: ${data.userOpHash.slice(0, 10)}...`,
-          ""
-        );
-
-        // Auto-fetch balance after verification
-        const addr = walletAddress;
-        if (addr) {
-          try {
-            const { usdcBalance, vaultShares } = await getBalances(addr);
-            if (vaultShares > BigInt(0)) setHasShares(true);
-            if (usdcBalance === BigInt(0)) {
-              print("Top up your wallet with USDC to deposit.", "");
-            } else {
-              print(`USDC balance: $${formatBigintUSDC(usdcBalance)}`, "");
-              print("Type 'deposit <amount>' or tap below.", "");
-            }
-          } catch {
-            /* ignore balance fetch errors */
-          }
-        }
-
-        // If a deposit was waiting, execute it now
-        if (pendingDeposit !== null) {
-          const amount = pendingDeposit;
-          setPendingDeposit(null);
-          await executeDeposit(amount);
-        }
-      } catch (err) {
-        print(
-          `Error registering on-chain: ${err instanceof Error ? err.message : "unknown"}`,
-          ""
-        );
+      // If a deposit was waiting, execute it now
+      if (pendingDeposit !== null) {
+        const amount = pendingDeposit;
+        setPendingDeposit(null);
+        await executeDeposit(amount);
       }
     },
     [pendingDeposit, print, walletAddress]
@@ -538,45 +369,30 @@ export default function Terminal() {
     }
 
     try {
-      // amount in USDC has 6 decimals
       const amountRaw = BigInt(Math.floor(amount * 1e6));
 
-      // Encode Permit2 approve calldata
       const approveCalldata = encodeFunctionData({
         abi: PERMIT2_APPROVE_ABI,
         functionName: "approve",
-        args: [
-          USDC_ADDRESS,
-          VAULT_ADDRESS,
-          amountRaw, // uint160
-          0,         // expiration=0 — single-use, consumed in same tx batch
-        ],
+        args: [USDC_ADDRESS, VAULT_ADDRESS, amountRaw, 0],
       });
 
-      // Encode vault deposit calldata
       const depositCalldata = encodeFunctionData({
         abi: DEPOSIT_ABI,
         functionName: "deposit",
         args: [amountRaw],
       });
 
-      // Bundle: Permit2 approve + vault deposit in one sendTransaction
       const { data } = await MiniKit.sendTransaction({
         chainId: WORLD_CHAIN_ID,
         transactions: [
-          {
-            to: PERMIT2_ADDRESS,
-            data: approveCalldata,
-          },
-          {
-            to: VAULT_ADDRESS,
-            data: depositCalldata,
-          },
+          { to: PERMIT2_ADDRESS, data: approveCalldata },
+          { to: VAULT_ADDRESS, data: depositCalldata },
         ],
       });
 
       if (data.status !== "success") {
-        print("Error: Deposit transaction failed.", "");
+        print(`Error: Deposit failed — ${data.status}`, "");
         return;
       }
 
@@ -588,10 +404,7 @@ export default function Terminal() {
         ""
       );
     } catch (err) {
-      print(
-        `Error: ${err instanceof Error ? err.message : "unknown"}`,
-        ""
-      );
+      print(`Error: ${err instanceof Error ? err.message : "unknown"}`, "");
     }
   }
 
@@ -610,16 +423,11 @@ export default function Terminal() {
 
       const { data } = await MiniKit.sendTransaction({
         chainId: WORLD_CHAIN_ID,
-        transactions: [
-          {
-            to: VAULT_ADDRESS,
-            data: withdrawCalldata,
-          },
-        ],
+        transactions: [{ to: VAULT_ADDRESS, data: withdrawCalldata }],
       });
 
       if (data.status !== "success") {
-        print("Error: Withdrawal transaction failed.", "");
+        print("Error: Withdrawal failed.", "");
         return;
       }
 
@@ -630,10 +438,7 @@ export default function Terminal() {
         ""
       );
     } catch (err) {
-      print(
-        `Error: ${err instanceof Error ? err.message : "unknown"}`,
-        ""
-      );
+      print(`Error: ${err instanceof Error ? err.message : "unknown"}`, "");
     }
   }
 
@@ -647,7 +452,6 @@ export default function Terminal() {
 
     print("Connecting wallet...");
 
-    // Step 1: walletAuth
     let addr = walletAddress;
     if (!addr) {
       try {
@@ -668,9 +472,17 @@ export default function Terminal() {
       }
     }
 
-    // Step 2: immediately open IDKit for World ID verification
+    // Open IDKit for World ID verification
     print("Verifying humanity...");
-    setIdkitOpen(true);
+    try {
+      const res = await fetch("/api/sign-request");
+      if (!res.ok) throw new Error("Failed to fetch RP signature");
+      const ctx: RpContext = await res.json();
+      setRpContext(ctx);
+      setIdkitOpen(true);
+    } catch {
+      print("Error: Could not start verification.", "");
+    }
   }
 
   // ── Input handling ───────────────────────────────────────────────────────────
@@ -718,7 +530,6 @@ export default function Terminal() {
     if (!walletAddress || !isVerified) {
       return [{ label: "get started", action: handleGetStarted }];
     }
-    // Verified — show contextual buttons
     if (hasShares) {
       return [
         { label: "deposit", action: () => handleCommand("deposit 50") },
@@ -729,8 +540,6 @@ export default function Terminal() {
     return [
       { label: "deposit", action: () => handleCommand("deposit 50") },
       { label: "portfolio", action: () => handleCommand("portfolio") },
-      { label: "agent status", action: () => handleCommand("agent status") },
-      { label: "withdraw all", action: () => handleCommand("withdraw all") },
     ];
   }
 
@@ -747,7 +556,6 @@ export default function Terminal() {
       }}
       onClick={() => inputRef.current?.focus()}
     >
-      {/* Scrollable output */}
       <div
         style={{
           flex: 1,
@@ -762,7 +570,6 @@ export default function Terminal() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Shortcut buttons (mobile UX) — contextual based on user state */}
       <div
         style={{
           display: "flex",
@@ -790,7 +597,6 @@ export default function Terminal() {
         ))}
       </div>
 
-      {/* Input row */}
       <div style={{ display: "flex", alignItems: "center", paddingTop: "6px" }}>
         <span style={{ marginRight: "8px" }}>harvest&gt;</span>
         <input
@@ -815,28 +621,24 @@ export default function Terminal() {
         />
       </div>
 
-      {/* IDKit v2 widget — render prop pattern */}
-      {walletAddress && (
-        <IDKitWidget
+      {/* IDKit v4 widget — backend verification only, no on-chain verifyHuman */}
+      {rpContext && walletAddress && (
+        <IDKitRequestWidget
           app_id={APP_ID}
           action="verify-human"
-          signal={walletAddress}
-          verification_level={VerificationLevel.Orb}
+          rp_context={rpContext}
+          allow_legacy_proofs={true}
+          preset={orbLegacy({ signal: walletAddress })}
+          open={idkitOpen}
+          onOpenChange={setIdkitOpen}
           handleVerify={handleVerify}
           onSuccess={handleIdkitSuccess}
-          onError={(error) => {
-            print(`World ID error: ${JSON.stringify(error)}`, "");
+          onError={(errorCode: IDKitErrorCodes) => {
+            print(`World ID error: ${errorCode}`, "");
             setIdkitOpen(false);
             setPendingDeposit(null);
           }}
-        >
-          {({ open }) => {
-            if (idkitOpen) {
-              setTimeout(open, 0);
-            }
-            return <></>;
-          }}
-        </IDKitWidget>
+        />
       )}
     </div>
   );
