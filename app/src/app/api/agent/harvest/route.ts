@@ -31,7 +31,21 @@ const publicClient = createPublicClient({
   transport: http(RPC_URL),
 });
 
+// Vercel Cron sends GET requests
+export async function GET(request: Request) {
+  // Verify the request is from Vercel Cron
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return harvest();
+}
+
 export async function POST() {
+  return harvest();
+}
+
+async function harvest() {
   // 1. Check for agent private key
   const agentKey = process.env.AGENT_PRIVATE_KEY;
   if (!agentKey) {
