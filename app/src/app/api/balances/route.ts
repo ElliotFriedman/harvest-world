@@ -16,7 +16,7 @@ const client = createPublicClient({
 });
 
 const USDC = "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" as const;
-const VAULT = "0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD" as const;
+const VAULT = (process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? "0x512ce44e4f69a98bc42a57ced8257e65e63cd74f") as `0x${string}`;
 
 const balanceOfAbi = [{ inputs: [{ name: "account", type: "address" }], name: "balanceOf", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" }] as const;
 const vaultAbi = [
