@@ -200,10 +200,12 @@ export default function Terminal() {
     }
 
     if (!MiniKit.isInstalled()) {
-      print(
-        "Error: Open this app inside World App to deposit.",
-        ""
-      );
+      print("Error: Open this app inside World App.", "");
+      return;
+    }
+
+    if (!walletAddress) {
+      print("Connect your wallet first. Tap 'connect wallet' below.", "");
       return;
     }
 
@@ -213,6 +215,7 @@ export default function Terminal() {
         "World ID verification required first — opening IDKit...",
         ""
       );
+      print(`Signal (wallet): ${walletAddress}`);
       setPendingDeposit(amount);
       await openIdkit();
       return;
