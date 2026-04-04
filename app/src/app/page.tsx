@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type { IDKitResult, IDKitErrorCodes, RpContext } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData } from "viem";
-import { getBalances, getVaultTvl } from "../lib/client";
+import { getBalances, getVaultTvl, getAgentStatus, triggerHarvest } from "../lib/client";
 
 // Lazy-load IDKit to prevent crashes in World App webview
 const LazyIDKit = dynamic(
@@ -112,7 +112,11 @@ export default function Terminal() {
   async function typewriterPrint(text: string, delayMs = 28): Promise<void> {
     setLines((prev) => [...prev, ""]);
     for (let i = 1; i <= text.length; i++) {
+<<<<<<< HEAD
       await new Promise((resolve) => setTimeout(resolve, delayMs));
+=======
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+>>>>>>> adbe943ef85c31391f0596345a28e3d0135128f2
       setLines((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = text.slice(0, i);
@@ -593,7 +597,7 @@ export default function Terminal() {
       await handleAgentHarvest();
     } else if (cmd === "clear") {
       setLines([]);
-    } else if (cmd === "wonder") {
+    } else if (trimmed === "easter egg") {
       await handleEasterEgg();
     } else {
       print(`Unknown command: '${cmd}'. Type 'help' for options.`, "");
