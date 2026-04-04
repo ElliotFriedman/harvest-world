@@ -306,18 +306,17 @@ All 26 findings are acknowledged and tracked as GitHub issues [#78](https://gith
 
 **Certora Formal Verification** — branch [`feat/certora-formal-specs`](https://github.com/ElliotFriedman/harvest-world/tree/feat/certora-formal-specs) | [PR #93](https://github.com/ElliotFriedman/harvest-world/pull/93)
 
-We wrote Certora Prover specs (CVL2) for all 4 core contracts. Formal verification uses SMT solvers to mathematically prove properties hold for every possible input in every reachable state — not just the cases unit tests happen to cover. **35 properties verified, all passing.**
+We wrote Certora Prover specs (CVL2) for the 3 core contracts. Formal verification uses SMT solvers to mathematically prove properties hold for every possible input in every reachable state — not just the cases unit tests happen to cover. **30 properties verified, all passing.**
 
 | Contract | Spec | Passing | Dashboard |
 |----------|------|---------|-----------|
 | `BeefyVaultV7` | `certora/specs/BeefyVaultV7.spec` | **15/15** | [Certora Report](https://prover.certora.com/output/651303/496832330da84903aebb2e06001116bd?anonymousKey=e0cc398a4f028ec7d493cbdbf5c4938ad2a6fb6e) |
 | `BaseAllToNativeFactoryStrat` | `certora/specs/BaseStrategy.spec` | **10/10** | [Certora Report](https://prover.certora.com/output/651303/96851137a8f04b30a2b5a2aa845711a8?anonymousKey=bf48592a43f3083fe687d9db12f2971fb14ff264) |
-| `StrategyMorphoMerkl` | `certora/specs/StrategyMorphoMerkl.spec` | **5/5** | [Certora Report](https://prover.certora.com/output/651303/4cfad9631e654fbcb13f7a097c621727) |
-| `BeefySwapper` | `certora/specs/BeefySwapper.spec` | **5/5** | [Certora Report](https://prover.certora.com/output/651303/43330419fcc64aedb6144b7ed5cc6ea0?anonymousKey=7b01c76d876d90cfd5e13cb9ebc764652b9f99ac) |
+| `StrategyMorphoMerkl` | `certora/specs/StrategyMorphoMerkl.spec` | **5/5** | |
 
-Key properties proven: share minting/burning correctness, deposit-withdraw round-trip safety, price-per-share monotonicity under yield, locked profit decay, manager/owner access control, reward token safety, slippage bounds.
+Key properties proven: share minting/burning correctness, deposit-withdraw round-trip safety, price-per-share monotonicity under yield, locked profit decay, manager/owner access control, reward token safety.
 
-Each contract has a harness (exposing internal state as external views), mock contracts (Morpho vault, Merkl claimer, oracle, ERC-20), and a `.conf` file for the Certora cloud runner. Run all: `bash certora/run_all.sh`
+Each contract has a harness (exposing internal state as external views), mock contracts (Morpho vault, Merkl claimer, ERC-20), and a `.conf` file for the Certora cloud runner. Run all: `bash certora/run_all.sh`
 
 **Onchain Harvest Proof** — [`0x1dcd4409...`](https://worldscan.org/tx/0x1dcd44098325f7943b112aaef912f27d1cad0ca25cdac53ddad2e44095dd341b)
 

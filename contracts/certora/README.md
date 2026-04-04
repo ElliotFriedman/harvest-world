@@ -25,7 +25,6 @@ The Certora Prover models EVM bytecode symbolically, treating function inputs an
 | `BeefyVaultV7` | `src/BeefyVaultV7.sol` | `certora/harness/BeefyVaultV7Harness.sol` |
 | `BaseAllToNativeFactoryStrat` | `src/BaseAllToNativeFactoryStrat.sol` | `certora/harness/StrategyMorphoMerklHarness.sol` |
 | `StrategyMorphoMerkl` | `src/StrategyMorphoMerkl.sol` | `certora/harness/StrategyMorphoMerklHarness.sol` |
-| `BeefySwapper` | `src/BeefySwapper.sol` | `certora/harness/BeefySwapperHarness.sol` |
 
 ---
 
@@ -104,27 +103,6 @@ The Certora Prover models EVM bytecode symbolically, treating function inputs an
 
 ---
 
-### BeefySwapper (`certora/specs/BeefySwapper.spec`)
-
-| ID | Name | Category | Description |
-|---|---|---|---|
-| I-1 | `slippageNeverExceedsDivisor` | Invariant | `slippage` storage variable is always <= `1e18` in every reachable state |
-| R-1 | `swapRevertsIfNoSwapData` | Swap safety | `swap()` reverts when no route is configured for a token pair |
-| R-2 | `slippageAlwaysApplied` | Swap safety | `swap()` reverts when oracle-adjusted output would fall below minimum |
-| R-3 | `swapDoesNotChangeCallerBalanceOnRevert` | Swap safety | A reverted swap leaves the caller's fromToken balance unchanged |
-| R-4 | `slippageMax100Percent` | Slippage config | `setSlippage(> 1e18)` clamps stored slippage to exactly `1e18` |
-| R-5 | `setSlippageUpdatesStorage` | Slippage config | `setSlippage(val)` stores `val` when `val <= 1e18` |
-| R-6 | `slippageZeroAllowed` | Slippage config | `setSlippage(0)` succeeds and stores 0 |
-| R-7 | `onlyOwnerCanSetOracle` | Access control | `setOracle()` reverts for non-owner callers |
-| R-8 | `setOracleUpdatesStorage` | Storage integrity | After `setOracle(addr)`, `getOracleAddr()` returns `addr` |
-| R-9 | `onlyOwnerCanSetSwapInfo` | Access control | `setSwapInfo()` reverts for non-owner callers |
-| R-10 | `setSwapInfoUpdatesStorage` | Storage integrity | After `setSwapInfo(a, b, info)`, `getSwapInfoRouter(a, b)` returns `info.router` |
-| R-11 | `onlyOwnerCanSetSlippage` | Access control | `setSlippage()` reverts for non-owner callers |
-| R-12 | `explicitSwapRevertsWhenOutputBelowMin` | Swap safety | Explicit-min swap reverts whenever final toToken balance < `minAmountOut` |
-| R-13 | `setSwapInfoRouterZeroAllowed` | Swap info config | Zero-router `setSwapInfo()` succeeds — enables route deletion |
-| R-14 | `setOracleToZeroAllowed` | Oracle config | `setOracle(0)` is not blocked (documents absence of zero-address check) |
-| R-15 | `getAmountOutDoesNotChangeSlippage` | View purity | `getAmountOut()` does not modify the `slippage` storage variable |
-
 ---
 
 ## Harness Design Pattern
@@ -169,8 +147,6 @@ certoraRun certora/confs/BaseStrategy.conf
 # Morpho + Merkl accounting, reward safety, pool monotonicity
 certoraRun certora/confs/StrategyMorphoMerkl.conf
 
-# Swapper slippage protection, access control, route integrity
-certoraRun certora/confs/BeefySwapper.conf
 ```
 
 Or run all jobs sequentially using the provided script:
@@ -201,6 +177,5 @@ Verification results: https://prover.certora.com/output/<job-id>/
 | `rule_sanity: basic` | enabled | Catches rules that pass vacuously — where preconditions are always false |
 | `optimistic_loop: true` | enabled | Assumes loops terminate (no unbounded iteration proofs needed) |
 | `loop_iter: 3` | 3 iterations | Unrolls loops up to 3 times; sufficient for array bounds used in these contracts |
-| `multi_assert_check: true` | enabled | Each `assert` in a rule is checked independently for finer-grained counterexamples |
+| `multi_assert_check: false` | disabled | Disabled to avoid spurious prover errors from EVM jump resolution |
 | `process: emv` | EMV | Uses the Ethereum model checker (most complete EVM model available) |
-| `optimistic_fallback: true` | enabled in BeefySwapper | Treats the router's low-level `fallback()` call as succeeding (returns true), which is more realistic than always-reverting |

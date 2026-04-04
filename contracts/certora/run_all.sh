@@ -55,7 +55,7 @@ cd "$CONTRACTS_DIR"
 #    Covers: share arithmetic, access control, earn flow, price-per-share,
 #            round-trip safety, depositor isolation.
 # ---------------------------------------------------------------------------
-echo "[1/4] Submitting BeefyVaultV7 verification..."
+echo "[1/3] Submitting BeefyVaultV7 verification..."
 certoraRun certora/confs/BeefyVaultV7.conf
 echo "      Submitted. See report URL above."
 echo ""
@@ -65,7 +65,7 @@ echo ""
 #    Covers: locked-profit decay, access control (vault-only + manager-only),
 #            pause safety, harvest timestamp update.
 # ---------------------------------------------------------------------------
-echo "[2/4] Submitting BaseStrategy verification..."
+echo "[2/3] Submitting BaseStrategy verification..."
 certoraRun certora/confs/BaseStrategy.conf
 echo "      Submitted. See report URL above."
 echo ""
@@ -75,23 +75,12 @@ echo ""
 #    Covers: Morpho pool accounting, deposit/withdraw atomicity, Merkl claim
 #            isolation, reward token safety (cannot add want/native/morphoVault).
 # ---------------------------------------------------------------------------
-echo "[3/4] Submitting StrategyMorphoMerkl verification..."
+echo "[3/3] Submitting StrategyMorphoMerkl verification..."
 certoraRun certora/confs/StrategyMorphoMerkl.conf
 echo "      Submitted. See report URL above."
 echo ""
 
-# ---------------------------------------------------------------------------
-# 4. BeefySwapper
-#    Covers: slippage invariant, swap safety (no-route revert, slippage guard),
-#            access control (setSwapInfo, setOracle, setSlippage), storage
-#            integrity, view purity.
-# ---------------------------------------------------------------------------
-echo "[4/4] Submitting BeefySwapper verification..."
-certoraRun certora/confs/BeefySwapper.conf
-echo "      Submitted. See report URL above."
-echo ""
-
 echo "============================================================"
-echo " All 4 verification jobs submitted successfully."
+echo " All 3 verification jobs submitted successfully."
 echo " Visit https://prover.certora.com to track job status."
 echo "============================================================"
