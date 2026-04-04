@@ -2,6 +2,9 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
+import {
+    ITransparentUpgradeableProxy
+} from "@openzeppelin-4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BeefyVaultV7} from "../src/BeefyVaultV7.sol";
 import {StrategyMorphoMerkl} from "../src/StrategyMorphoMerkl.sol";
@@ -10,11 +13,16 @@ import {BeefySwapper} from "../src/BeefySwapper.sol";
 /// @notice Post-deployment verification script.
 ///         Run: forge script script/VerifyDeployment.s.sol --rpc-url https://worldchain.drpc.org -vvv
 contract VerifyDeployment is Script {
-    // ── Deployed Harvest contracts ───────────────────────────────────────────
+    // ── Deployed Harvest contracts (proxies) ─────────────────────────────────
+    // Update these addresses after each deployment.
     BeefyVaultV7 internal constant VAULT = BeefyVaultV7(0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD);
     StrategyMorphoMerkl internal constant STRATEGY =
         StrategyMorphoMerkl(payable(0xd2753e1Ce625A776A4d73f0251419Ba5Dfc1c0A5));
     BeefySwapper internal constant SWAPPER = BeefySwapper(0xe770BD40b6976Efbbb095174395DD2cb794c938a);
+
+    // ── Deployed ProxyAdmin ───────────────────────────────────────────────────
+    // Update this address after each deployment.
+    address internal constant PROXY_ADMIN = address(0); // TODO: set after deploy
 
     // ── Expected external addresses ──────────────────────────────────────────
     address internal constant USDC = 0x79A02482A880bCE3F13e09Da970dC34db4CD24d1;
@@ -32,6 +40,7 @@ contract VerifyDeployment is Script {
         console.log("");
 
         _verifyContracts();
+        _verifyProxies();
         _verifyVault();
         _verifyStrategy();
         _verifySwapper();
@@ -46,6 +55,34 @@ contract VerifyDeployment is Script {
         _check("Vault has code", address(VAULT).code.length > 0);
         _check("Strategy has code", address(STRATEGY).code.length > 0);
         _check("Swapper has code", address(SWAPPER).code.length > 0);
+        console.log("");
+    }
+
+    function _verifyProxies() internal view {
+        console.log("[PROXIES]");
+
+        address vaultImpl = ITransparentUpgradeableProxy(address(VAULT)).implementation();
+        address stratImpl = ITransparentUpgradeableProxy(address(STRATEGY)).implementation();
+        address swapperImpl = ITransparentUpgradeableProxy(address(SWAPPER)).implementation();
+        address vaultAdmin = ITransparentUpgradeableProxy(address(VAULT)).admin();
+        address stratAdmin = ITransparentUpgradeableProxy(address(STRATEGY)).admin();
+        address swapperAdmin = ITransparentUpgradeableProxy(address(SWAPPER)).admin();
+
+        // Implementations must be non-zero (proxies point somewhere)
+        _check("vault proxy has implementation", vaultImpl != address(0));
+        _check("strategy proxy has implementation", stratImpl != address(0));
+        _check("swapper proxy has implementation", swapperImpl != address(0));
+
+        // All three proxies must share the same ProxyAdmin
+        _check("vault admin == PROXY_ADMIN", PROXY_ADMIN == address(0) || vaultAdmin == PROXY_ADMIN);
+        _check("strategy admin == PROXY_ADMIN", PROXY_ADMIN == address(0) || stratAdmin == PROXY_ADMIN);
+        _check("swapper admin == PROXY_ADMIN", PROXY_ADMIN == address(0) || swapperAdmin == PROXY_ADMIN);
+        _check("all proxies share same admin", vaultAdmin == stratAdmin && stratAdmin == swapperAdmin);
+
+        console.log("  vault impl:    ", vaultImpl);
+        console.log("  strategy impl: ", stratImpl);
+        console.log("  swapper impl:  ", swapperImpl);
+        console.log("  proxy admin:   ", vaultAdmin);
         console.log("");
     }
 

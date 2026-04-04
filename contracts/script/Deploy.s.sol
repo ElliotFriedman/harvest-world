@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-4/contracts/proxy/transparent/ProxyAdmin.sol";
 import {HarvestDeployer} from "./deployers/HarvestDeployer.sol";
 import {BeefySwapper} from "../src/BeefySwapper.sol";
 
@@ -45,12 +47,21 @@ contract Deploy is Script {
 
         vm.startBroadcast();
 
-        // ── 1. Deploy BeefySwapper ──────────────────────────────────────────
-        // No oracle needed — strategy always calls swap(from, to, amount, 0)
-        BeefySwapper swapper = new BeefySwapper();
-        swapper.initialize(address(0), 0);
+        // ── 1. Deploy ProxyAdmin (owns all proxies — transfer to multisig post-hackathon) ──
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
 
-        // ── 2. Configure Uniswap V3 swap routes ────────────────────────────
+        // ── 2. Deploy BeefySwapper behind a proxy ────────────────────────────���─
+        // No oracle needed — strategy always calls swap(from, to, amount, 0)
+        BeefySwapper swapperImpl = new BeefySwapper();
+        BeefySwapper swapper = BeefySwapper(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(swapperImpl), address(proxyAdmin), abi.encodeCall(BeefySwapper.initialize, (address(0), 0))
+                )
+            )
+        );
+
+        // ── 3. Configure Uniswap V3 swap routes ────────────────────────────────
         //
         // exactInputSingle calldata layout (228 bytes):
         //   [0:4]     selector 0x04e45aaf
@@ -65,7 +76,7 @@ contract Deploy is Script {
         _setUniV3Route(swapper, uniV3Router, wld, weth, 3000); // 0.3% — WLD/WETH pool has liquidity
         _setUniV3Route(swapper, uniV3Router, weth, usdc, 500); // 0.05% — WETH/USDC pool has liquidity
 
-        // ── 3. Deploy vault + strategy ──────────────────────────────────────
+        // ── 4. Deploy vault + strategy behind proxies ──────────────────────────
         HarvestDeployer.ExternalAddresses memory ext = HarvestDeployer.ExternalAddresses({
             want: usdc,
             depositToken: address(0),
@@ -77,16 +88,17 @@ contract Deploy is Script {
         });
 
         HarvestDeployer.DeployParams memory params = HarvestDeployer.DeployParams({
-            vaultName: "Moo World Morpho USDC",
-            vaultSymbol: "mooWorldMorphoUSDC",
+            vaultName: "Harvest World Morpho USDC",
+            vaultSymbol: "harvestWorldMorphoUSDC",
             harvestOnDeposit: true,
             rewards: rewards
         });
 
-        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);
+        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params, address(proxyAdmin));
 
         vm.stopBroadcast();
 
+        console.log("ProxyAdmin:       ", address(proxyAdmin));
         console.log("BeefySwapper:     ", address(swapper));
         console.log("Vault:            ", address(d.vault));
         console.log("Strategy:         ", address(d.strategy));

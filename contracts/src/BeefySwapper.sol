@@ -18,6 +18,11 @@ contract BeefySwapper is OwnableUpgradeable {
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
     using BytesLib for bytes;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @dev Price update failed for a token
     error PriceFailed(address token);
 

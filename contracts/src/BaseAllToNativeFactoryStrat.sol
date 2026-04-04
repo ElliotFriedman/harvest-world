@@ -11,6 +11,11 @@ import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 abstract contract BaseAllToNativeFactoryStrat is OwnableUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     struct Addresses {
         address want;
         address depositToken;
