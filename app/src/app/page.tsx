@@ -155,14 +155,14 @@ export default function Terminal() {
   async function handleHelp() {
     print(
       "Commands:",
-      "  vaults              — list available vaults",
-      "  deposit <amt>       — deposit USDC into the vault",
-      "  withdraw all        — withdraw all shares from the vault",
-      "  withdraw <amt>      — withdraw <amt> USDC worth of shares",
-      "  portfolio           — view your positions",
-      "  agent status        — view harvester activity",
-      "  agent harvest       — trigger manual harvest",
-      "  clear               — clear terminal",
+      "  vaults        — list vaults",
+      "  deposit <amt> — deposit USDC",
+      "  withdraw all  — withdraw all",
+      "  withdraw <n>  — withdraw $n",
+      "  portfolio     — your positions",
+      "  agent status  — harvester info",
+      "  agent harvest — manual harvest",
+      "  clear         — clear screen",
       ""
     );
   }
@@ -623,7 +623,7 @@ export default function Terminal() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
-        padding: "16px",
+        padding: "10px",
         overflow: "hidden",
       }}
       onClick={() => inputRef.current?.focus()}
@@ -705,7 +705,7 @@ export default function Terminal() {
           action="verify-human"
           rp_context={rpContext}
           allow_legacy_proofs={true}
-          preset={orbLegacy()}
+          preset={orbLegacy({ signal: walletAddress ?? undefined })}
           open={idkitOpen}
           onOpenChange={setIdkitOpen}
           handleVerify={handleVerify}
