@@ -143,7 +143,7 @@ Strip: TimelockController, BeefyTreasury, complex fee config, governance
 2. **Permit2 required.** MiniKit blocks standard ERC-20 `approve()` calls. Vault deposit must use Permit2 (`0x000000000022D473030F116dDEE9F6B43aC78BA3`). This is a Beefy fork modification — the vault's deposit path needs `permit2.transferFrom()` instead of `token.transferFrom()`.
 3. **Contract whitelisting required.** All contracts the mini app interacts with must be whitelisted in the Developer Portal under Configuration → Advanced BEFORE any user transactions work. Non-whitelisted = `invalid_contract` error.
 4. **sendTransaction returns userOpHash, not tx hash.** Must poll `developer.worldcoin.org/api/v2/minikit/userop/{hash}` for final transaction hash.
-5. **App store listing won't be approved during hackathon.** Demo via QR code testing flow instead. App name cannot contain "World". Description max 25 words.
+5. **App store listing won't be approved during hackathon.** The store card/logo won't show until post-approval. Demo via QR code testing flow instead. App name cannot contain "World". Description max 25 words.
 
 ## Infra Checklist
 
@@ -153,7 +153,6 @@ Full checklist at `/Users/elliot/harvest-infra-checklist.md`. Key items to do NO
 - [ ] Deployer wallet funded with ETH on World Chain mainnet
 - [ ] Confirm Orb-verified team member (needed for AgentKit registration)
 - [ ] Vercel project linked to repo
-- [ ] Supabase project created
 
 ## Context for AI Assistants
 

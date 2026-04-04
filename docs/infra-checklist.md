@@ -66,7 +66,6 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
   │   ├── script/
   │   └── foundry.toml
   ├── agent/                # Harvester agent (if separate)
-  ├── supabase/             # Supabase migrations & config
   ├── .env.example
   ├── .gitignore
   └── package.json          # Root workspace config
@@ -169,11 +168,6 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
     NEXT_PUBLIC_WORLD_CHAIN_ID=480             # World Chain mainnet
     NEXT_PUBLIC_ALCHEMY_RPC=https://worldchain-mainnet.g.alchemy.com/v2/YOUR_KEY
     
-    # Supabase
-    NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbG...
-    SUPABASE_SERVICE_ROLE_KEY=eyJhbG...        # Server-side only
-    
     # World Developer Portal
     DEV_PORTAL_API_KEY=your_api_key            # For notification sending & verification
     
@@ -240,80 +234,23 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
   - Time: 5 minutes
   - Who: Team lead
 
-### Supabase
+### Agent State File
 
-- [ ] **Create Supabase project**
-  - URL: https://supabase.com
-  - Free tier: **Sufficient** -- 500MB database, 1GB file storage, 50K monthly active users, 500K edge function invocations
-  - Choose region closest to your users (EU for Cannes demo)
-  - Time: 5 minutes
-  - Blocking: Backend data storage
-  - Who: Backend dev
-
-- [ ] **Set up database tables**
-  - Suggested schema for a yield aggregator:
-    ```sql
-    -- User profiles (linked to World ID)
-    CREATE TABLE users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      wallet_address TEXT UNIQUE NOT NULL,
-      username TEXT,
-      world_id_nullifier TEXT UNIQUE,
-      is_orb_verified BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    -- Vault positions
-    CREATE TABLE positions (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID REFERENCES users(id),
-      vault_address TEXT NOT NULL,
-      amount_deposited NUMERIC,
-      token_symbol TEXT,
-      tx_hash TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    -- Yield strategies / opportunities cache
-    CREATE TABLE strategies (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      protocol TEXT NOT NULL,
-      pool_name TEXT,
-      apy NUMERIC,
-      tvl NUMERIC,
-      token_address TEXT,
-      vault_address TEXT,
-      chain_id INTEGER DEFAULT 480,
-      last_updated TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    -- Harvest history (agent actions)
-    CREATE TABLE harvests (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      vault_address TEXT NOT NULL,
-      strategy_address TEXT,
-      profit_amount NUMERIC,
-      tx_hash TEXT,
-      harvested_at TIMESTAMPTZ DEFAULT NOW()
-    );
+- [ ] **Ensure agent writes harvest state to `agent/last-harvest.json`**
+  - The cron job writes a JSON file after each successful harvest:
+    ```json
+    {
+      "lastRun": "2026-04-04T12:00:00Z",
+      "lastTxHash": "0x...",
+      "rewardsClaimed": "12.34",
+      "profitUsd": "12.34",
+      "status": "success"
+    }
     ```
-  - Time: 20 minutes
-  - Who: Backend dev
-
-- [ ] **Configure Row Level Security (RLS)**
-  - Enable RLS on all tables
-  - Users can only read their own positions
-  - Strategies table: public read, admin-only write
-  - For hackathon: can keep RLS simple or even skip if time-constrained
-  - Time: 15 minutes
-  - Who: Backend dev
-
-- [ ] **Get API keys**
-  - Supabase Dashboard > Project Settings > API
-  - Copy: Project URL, `anon` key (public), `service_role` key (server-side only, NEVER expose to client)
-  - Add to Vercel environment variables
-  - Time: 2 minutes
-  - Who: Backend dev
+  - The `agent status` terminal command reads this file via a server route
+  - No database needed — flat file is sufficient for hackathon
+  - Time: already handled in agent code
+  - Who: Agent dev
 
 ---
 
@@ -407,7 +344,6 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
   - Keys to track:
     - Deployer wallet private key
     - Agent/harvester wallet private key
-    - Supabase service role key
     - Alchemy API key
     - Developer Portal API key
     - OpenAI/Anthropic API key (if used)
@@ -531,7 +467,6 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
 |---------|----------|----------------------|-----|-------|
 | World Developer Portal | App ID + API Key | Yes (free) | https://developer.worldcoin.org | Required. API key for notifications & verification |
 | Alchemy | API Key | Yes (300M CU/month) | https://www.alchemy.com/world-chain | RPC provider. Public endpoint exists as fallback |
-| Supabase | Project URL + anon/service keys | Yes (500MB DB) | https://supabase.com | Database, auth, edge functions |
 | Vercel | N/A (GitHub integration) | Yes (Hobby tier) | https://vercel.com | Hosting, serverless, custom domains |
 | OpenAI | API Key | Pay-as-you-go (~$5-20) | https://platform.openai.com | Only if AI features used |
 | Anthropic | API Key | Pay-as-you-go (~$5-20) | https://console.anthropic.com | Alternative to OpenAI |
@@ -580,7 +515,6 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
 | ETH for deployment (World Chain mainnet) | ~$15-30 in ETH | Yes |
 | ETH for agent wallet gas | ~$5-10 in ETH | Yes (if using agent) |
 | Alchemy | Free | Yes |
-| Supabase | Free | Yes |
 | Vercel | Free | Yes |
 | World Developer Portal | Free | Yes |
 | OpenAI/Anthropic credits | ~$5-20 | Only if AI features |
