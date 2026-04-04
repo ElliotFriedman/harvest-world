@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Forwards the IDKit proof payload as-is to the World ID backend.
+// Forwards the IDKit v2 proof payload to the World ID v2 verification endpoint.
 // Returns the verification result so the client can proceed with
 // calling vault.verifyHuman() on-chain.
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
   const res = await fetch(
-    `https://developer.world.org/api/v4/verify/${process.env.WORLD_RP_ID}`,
+    `https://developer.worldcoin.org/api/v2/verify/${process.env.NEXT_PUBLIC_APP_ID}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
