@@ -78,7 +78,7 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v1.6 — Agentic DeFi, for humans.",
+    "HARVEST v1.7 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
