@@ -147,6 +147,14 @@ This section exists for one reason: to show judges we went all-in.
 - **Saturday evening** — AgentKit harvester live, Uniswap Trading API integrated, streaming yield display shipped
 - **Sunday 5AM** — security audit + Certora specs completed
 
+### Vercel Rate Limit — 100+ Deployments in 24 Hours
+
+We hit Vercel's free-tier deployment limit (100 deploys in 24 hours) during the hackathon — proof of how fast we were shipping.
+
+![Vercel rate limit hit — 100+ deployments in 24 hours](docs/images/vercel-rate-limit.png)
+
+> *"Resource is limited — try again in 24 hours (more than 100)"* — [PR #101](https://github.com/ElliotFriedman/harvest-world/pull/101)
+
 ---
 
 ### Merged Pull Requests
