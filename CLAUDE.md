@@ -41,6 +41,18 @@ When making changes to the product (scope, architecture, contracts, UI, demo), u
 | `agent/` | Harvester cron | Agent/harvester changes |
 | `README.md` | Repo README (mirrors pitch one-pager) | Any public-facing change |
 
+## README Proof of Work — Keep This Section Current
+
+The `README.md` contains a `## Proof of Work` section that judges read to assess effort. **Every time a PR is merged or a significant issue is resolved, update this section.**
+
+Specifically:
+- Add the new PR to the correct category table inside the `<details>` block (Infrastructure, Contracts, World ID, Permit2, Mini App, Agent, Features, Security)
+- Update the **Development Velocity** stats table: increment the merged PR count, update total commit count (`git log --oneline | wc -l`), and update the LOC count if significant code was added
+- If the PR closes an issue, move that issue from the **Roadmap** list to the **Completed** table
+- If a new category of work was introduced (e.g. a new area of the codebase), add a new category table inside `<details>`
+
+The commit count and PR count are the fastest way for judges to see work volume at a glance — keep them accurate.
+
 ## Key Design Decisions (DO NOT CHANGE without updating all files)
 
 1. **Shared vault, not per-user strategies** — one pool, proportional shares, one harvest benefits everyone
