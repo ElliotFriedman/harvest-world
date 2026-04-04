@@ -374,14 +374,14 @@ export default function Terminal() {
 
   async function handleEasterEgg() {
     await typewriterPrint("* you found the easter egg. congrats. *");
-    await new Promise<void>((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
     print("");
     await typewriterPrint("we wanted to add the wonder back into finance.");
-    await new Promise<void>((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 200));
     await typewriterPrint("the feeling of getting a new computer.");
-    await new Promise<void>((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 200));
     await typewriterPrint("and entering a whole new world...");
-    await new Promise<void>((r) => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 600));
     print("");
     await typewriterPrint("we hope you enjoy :)");
     print("");
