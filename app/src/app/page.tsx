@@ -468,6 +468,9 @@ export default function Terminal() {
   const handleIdkitSuccess = useCallback(
     async (result: IDKitResult) => {
       setIdkitOpen(false);
+      print("[DEBUG] handleIdkitSuccess called");
+      print(`[DEBUG] walletAddress at entry: ${walletAddress ?? "null"}`);
+      print(`[DEBUG] raw IDKit result: ${JSON.stringify(result).slice(0, 300)}`);
       print("World ID verified. Registering on-chain...");
 
       if (!MiniKit.isInstalled()) {
@@ -488,28 +491,59 @@ export default function Terminal() {
 
         if ("merkle_root" in response) {
           // V3 legacy format
+          print("[DEBUG] Branch: V3 legacy format (merkle_root found)");
           const v3 = response as ResponseItemV3;
+          const rawProofHex = v3.proof as string;
+          print(`[DEBUG] Raw proof hex (first 100): ${rawProofHex.slice(0, 100)}`);
+          print(`[DEBUG] Raw proof hex LENGTH: ${rawProofHex.length} chars (512=raw-packed, 576=ABI-encoded)`);
           root = BigInt(v3.merkle_root);
           nullifierHash = BigInt(v3.nullifier);
           const decoded = decodeProof(v3.proof as `0x${string}`);
+          print(`[DEBUG] Decoded proof element [0]: 0x${decoded[0].toString(16)}`);
+          print(`[DEBUG] Decoded proof element [1]: 0x${decoded[1].toString(16)}`);
+          print(`[DEBUG] Decoded proof element [2]: 0x${decoded[2].toString(16)}`);
+          print(`[DEBUG] Decoded proof element [3]: 0x${decoded[3].toString(16)}`);
+          print(`[DEBUG] Decoded proof element [4]: 0x${decoded[4].toString(16)}`);
+          print(`[DEBUG] Decoded proof element [5]: 0x${decoded[5].toString(16)}`);
+          print(`[DEBUG] Decoded proof element [6]: 0x${decoded[6].toString(16)}`);
+          print(`[DEBUG] Decoded proof element [7]: 0x${decoded[7].toString(16)}`);
           proofArray = decoded.map((d) => BigInt(d)) as unknown as typeof proofArray;
         } else if ("nullifier" in response) {
+          print("[DEBUG] Branch: V4 format (nullifier found, no merkle_root)");
           const v4 = response as ResponseItemV4;
+          const rawProofStr = JSON.stringify(v4.proof);
+          print(`[DEBUG] Raw v4 proof array (first 100): ${rawProofStr.slice(0, 100)}`);
+          print(`[DEBUG] v4 proof array length: ${v4.proof.length}`);
           root = BigInt(v4.proof[4]);
           nullifierHash = BigInt(v4.nullifier);
           const elements = v4.proof.slice(0, 4).map((p) => BigInt(p));
           while (elements.length < 8) elements.push(BigInt(0));
+          print(`[DEBUG] V4 proof element [0]: 0x${elements[0].toString(16)}`);
+          print(`[DEBUG] V4 proof element [1]: 0x${elements[1].toString(16)}`);
+          print(`[DEBUG] V4 proof element [2]: 0x${elements[2].toString(16)}`);
+          print(`[DEBUG] V4 proof element [3]: 0x${elements[3].toString(16)}`);
+          print(`[DEBUG] V4 proof element [4]: 0x${elements[4].toString(16)}`);
+          print(`[DEBUG] V4 proof element [5]: 0x${elements[5].toString(16)}`);
+          print(`[DEBUG] V4 proof element [6]: 0x${elements[6].toString(16)}`);
+          print(`[DEBUG] V4 proof element [7]: 0x${elements[7].toString(16)}`);
           proofArray = elements as unknown as typeof proofArray;
         } else {
           print("Error: Unsupported proof format.", "");
           return;
         }
 
+        print(`[DEBUG] root (full): ${root.toString()}`);
+        print(`[DEBUG] nullifierHash (full): ${nullifierHash.toString()}`);
+        print(`[DEBUG] signal (walletAddress): ${walletAddress ?? "null"}`);
+
         const verifyCalldata = encodeFunctionData({
           abi: VERIFY_HUMAN_ABI,
           functionName: "verifyHuman",
           args: [root, nullifierHash, proofArray],
         });
+
+        print(`[DEBUG] Encoded calldata (first 100): ${(verifyCalldata as string).slice(0, 100)}`);
+        print(`[DEBUG] VAULT_ADDRESS being called: ${VAULT_ADDRESS}`);
 
         const { data } = await MiniKit.sendTransaction({
           chainId: WORLD_CHAIN_ID,
@@ -520,6 +554,8 @@ export default function Terminal() {
             },
           ],
         });
+
+        print(`[DEBUG] Full MiniKit sendTransaction result: ${JSON.stringify(data)}`);
 
         if (data.status !== "success") {
           print(`Error: tx failed — status=${data.status}`, "");
@@ -875,6 +911,8 @@ export default function Terminal() {
           handleVerify={handleVerify}
           onSuccess={handleIdkitSuccess}
           onError={(errorCode: IDKitErrorCodes) => {
+            print(`[DEBUG] IDKit onError callback fired`);
+            print(`[DEBUG] Full error code: ${JSON.stringify(errorCode)}`);
             print(`World ID error: ${errorCode}`, "");
             setIdkitOpen(false);
             setPendingDeposit(null);
