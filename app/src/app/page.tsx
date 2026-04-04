@@ -108,6 +108,7 @@ export default function Terminal() {
   const [usdcBalance, setUsdcBalance] = useState<bigint>(BigInt(0));
   const [isFlickering, setIsFlickering] = useState(false);
   const [isObserverMode, setIsObserverMode] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -124,7 +125,7 @@ export default function Terminal() {
           setWalletAddress(MiniKit.user.walletAddress);
         }
         setLines([
-          "HARVEST v2.5 — Agentic DeFi, for humans.",
+          "HARVEST v2.6 — Agentic DeFi, for humans.",
           "World Chain yield aggregator.",
           "",
         ]);
@@ -173,7 +174,7 @@ export default function Terminal() {
     // Desktop-only boot — type at 55ms (30% slower than the in-app 42ms default)
     const d = 55;
     await flicker();
-    await typewriterPrint("HARVEST OS v2.5", d);
+    await typewriterPrint("HARVEST OS v2.6", d);
     await new Promise((r) => setTimeout(r, 300));
     await typewriterPrint("initializing...", d);
     await new Promise((r) => setTimeout(r, 500));
@@ -522,39 +523,55 @@ export default function Terminal() {
 
   async function handleRoots() {
     print(
-      "HARVEST VAULT — proof of humanity",
-      "─────────────────────────────────",
-      "        [vault]",
+      "HARVEST — proof of humanity",
+      "────────────────────────────",
+      "",
+      "[human A]      [human B]",
+      "    │               │",
+      " Orb ✓           Orb ✓",
+      "    │               │",
+      " USDC in        USDC in",
+      "    └──────┬────────┘",
       "           │",
-      "    ┌──────┴──────┐",
-      "    │             │",
-      "[human]       [human]",
-      "    │             │",
-      " Orb ✓         Orb ✓",
+      "    ┌──────▼───────┐",
+      "    │ HARVEST VAULT│",
+      "    │   (hvUSDC)   │",
+      "    └──────┬───────┘",
+      "           │ into Morpho",
+      "    ┌──────▼───────┐",
+      "    │ MORPHO Re7   │",
+      "    │ ~4.23% APY   │",
+      "    └──────┬───────┘",
+      "           │ yield+WLD",
+      "    ┌──────▼───────┐",
+      "    │ AGENT        │",
+      "    │ (AgentKit)   │",
+      "    │ WLD→USDC     │",
+      "    │ (Uniswap V3) │",
+      "    └──────┬───────┘",
+      "           │",
+      "           └─ back to vault ↑",
       "",
-      "Every depositor is Orb-verified.",
+      "Every depositor: Orb-verified.",
       "No bots. No sybil farming.",
-      "The vault cryptographically guarantees",
-      "every dollar traces to a unique human.",
+      "Every dollar → unique human.",
       "",
-      "World ID router: 0x17B354dD...",
+      "Vault:    0x512CE4...cD74f",
+      "Strategy: 0x313bA1...0489",
+      "World ID: 0x17B354...278",
       ""
     );
   }
 
   async function handleScan() {
     print(
-      "┌─────────────────────────────────────┐",
-      "│  Open Harvest in World App          │",
-      "│                                     │",
-      "│  Scan the QR code on desktop, or:  │",
-      "│                                     │",
-      `│  ${WORLD_APP_URL.slice(0, 37)}  │`,
-      "│                                     │",
-      "│  Or search \"Harvest\" in World App.  │",
-      "└─────────────────────────────────────┘",
+      "Open Harvest in World App:",
+      `  ${WORLD_APP_URL}`,
+      "",
+      "  QR code ↓ (tap copy or open below)",
       ""
     );
+    setShowQR(true);
   }
 
   // ── Easter egg ──────────────────────────────────────────────────────────────
@@ -1027,6 +1044,55 @@ export default function Terminal() {
             </div>
           </div>
         </>
+      )}
+
+      {/* QR overlay — shown after 'scan' command, works on all screen sizes */}
+      {showQR && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "16px",
+            zIndex: 50,
+          }}
+          onClick={() => setShowQR(false)}
+        >
+          <div style={{ fontSize: "12px", color: "#00ff41", letterSpacing: "0.08em" }}>
+            SCAN TO OPEN IN WORLD APP
+          </div>
+          <div
+            style={{ background: "#000", padding: "12px", border: "1px solid #00ff41" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <LazyQRCode value={WORLD_APP_URL} size={200} bgColor="#000000" fgColor="#00ff41" />
+          </div>
+          <div style={{ display: "flex", gap: "10px" }} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => navigator.clipboard.writeText(WORLD_APP_URL)}
+              style={{ background: "transparent", border: "1px solid #00ff41", color: "#00ff41", fontFamily: "inherit", fontSize: "12px", padding: "6px 14px", cursor: "pointer" }}
+            >
+              [ copy link ]
+            </button>
+            <button
+              onClick={() => window.open(WORLD_APP_URL, "_blank")}
+              style={{ background: "transparent", border: "1px solid #00ff41", color: "#00ff41", fontFamily: "inherit", fontSize: "12px", padding: "6px 14px", cursor: "pointer" }}
+            >
+              [ open ]
+            </button>
+            <button
+              onClick={() => setShowQR(false)}
+              style={{ background: "transparent", border: "1px solid #00ff41", color: "#00ff41", fontFamily: "inherit", fontSize: "12px", padding: "6px 14px", cursor: "pointer" }}
+            >
+              [ close ]
+            </button>
+          </div>
+          <div style={{ fontSize: "10px", color: "#00ff41", opacity: 0.4 }}>tap anywhere to dismiss</div>
+        </div>
       )}
 
       {/* IDKit v4 widget — backend verification only, no on-chain verifyHuman */}
