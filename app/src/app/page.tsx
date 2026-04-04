@@ -124,7 +124,7 @@ export default function Terminal() {
           setWalletAddress(MiniKit.user.walletAddress);
         }
         setLines([
-          "HARVEST v2.4 — Agentic DeFi, for humans.",
+          "HARVEST v2.5 — Agentic DeFi, for humans.",
           "World Chain yield aggregator.",
           "",
         ]);
@@ -173,7 +173,7 @@ export default function Terminal() {
     // Desktop-only boot — type at 55ms (30% slower than the in-app 42ms default)
     const d = 55;
     await flicker();
-    await typewriterPrint("HARVEST OS v2.4", d);
+    await typewriterPrint("HARVEST OS v2.5", d);
     await new Promise((r) => setTimeout(r, 300));
     await typewriterPrint("initializing...", d);
     await new Promise((r) => setTimeout(r, 500));
