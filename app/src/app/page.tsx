@@ -1,16 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  IDKitRequestWidget,
-  IDKitResult,
-  IDKitErrorCodes,
-  RpContext,
-  orbLegacy,
-} from "@worldcoin/idkit";
+import dynamic from "next/dynamic";
+import type { IDKitResult, IDKitErrorCodes, RpContext } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData } from "viem";
 import { getBalances, getVaultTvl } from "../lib/client";
+
+// Lazy-load IDKit to prevent crashes in World App webview
+const LazyIDKit = dynamic(
+  () => import("../components/idkit-widget"),
+  { ssr: false }
+);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -623,12 +624,11 @@ export default function Terminal() {
 
       {/* IDKit v4 widget — backend verification only, no on-chain verifyHuman */}
       {rpContext && walletAddress && (
-        <IDKitRequestWidget
-          app_id={APP_ID}
+        <LazyIDKit
+          appId={APP_ID}
           action="verify-human"
-          rp_context={rpContext}
-          allow_legacy_proofs={true}
-          preset={orbLegacy({ signal: walletAddress })}
+          rpContext={rpContext}
+          walletAddress={walletAddress}
           open={idkitOpen}
           onOpenChange={setIdkitOpen}
           handleVerify={handleVerify}
