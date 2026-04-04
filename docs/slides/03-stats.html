@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harvest — Stats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #00ff00;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Scanlines */
+  body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 0, 0.015) 2px,
+      rgba(0, 255, 0, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Vignette */
+  body::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .content {
+    z-index: 2;
+    max-width: 1100px;
+    width: 100%;
+    padding: 0 80px;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 56px;
+  }
+
+  .header .logo {
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+
+  .header .logo .prompt {
+    color: #666666;
+  }
+
+  .header .tagline {
+    font-size: 24px;
+    font-weight: 400;
+    color: #f5a623;
+    padding-left: 2ch;
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 40px 48px;
+    margin-bottom: 56px;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat .number {
+    font-size: 48px;
+    font-weight: 700;
+    color: #00ff00;
+    line-height: 1.1;
+  }
+
+  .stat .label {
+    font-size: 14px;
+    font-weight: 400;
+    color: #666666;
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid #333333;
+    margin-bottom: 40px;
+  }
+
+  /* Integration badges */
+  .integrations {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+  }
+
+  .badge {
+    border: 1px solid #444444;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #00aa00;
+    letter-spacing: 0.5px;
+  }
+
+  .badge.primary {
+    border-color: #00ff00;
+    color: #00ff00;
+  }
+
+  /* Bottom */
+  .bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .bottom .left {
+    font-size: 16px;
+    font-weight: 400;
+    color: #00aa00;
+    line-height: 1.6;
+  }
+
+  .bottom .left .bright {
+    color: #00ff00;
+    font-weight: 700;
+  }
+
+  .bottom .right {
+    text-align: right;
+    font-size: 13px;
+    color: #666666;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+  <div class="content">
+    <div class="header">
+      <div class="logo"><span class="prompt">&gt; </span>harvest_</div>
+      <div class="tagline">DeFi, for humans.</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="number">178</div>
+        <div class="label">commits</div>
+      </div>
+      <div class="stat">
+        <div class="number">98</div>
+        <div class="label">pull requests</div>
+      </div>
+      <div class="stat">
+        <div class="number">20K</div>
+        <div class="label">lines of code</div>
+      </div>
+      <div class="stat">
+        <div class="number">$1K+</div>
+        <div class="label">real deposits</div>
+      </div>
+      <div class="stat">
+        <div class="number">2,710</div>
+        <div class="label">lines Solidity</div>
+      </div>
+      <div class="stat">
+        <div class="number">1,807</div>
+        <div class="label">lines TypeScript</div>
+      </div>
+      <div class="stat">
+        <div class="number">51</div>
+        <div class="label">Certora formal<br>properties verified</div>
+      </div>
+      <div class="stat">
+        <div class="number">36h</div>
+        <div class="label">build time</div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="integrations">
+      <span class="badge primary">World ID 4.0</span>
+      <span class="badge primary">AgentKit</span>
+      <span class="badge primary">MiniKit 2.0</span>
+      <span class="badge">Uniswap V3</span>
+      <span class="badge">Morpho</span>
+      <span class="badge">Merkl</span>
+      <span class="badge">Permit2</span>
+      <span class="badge">Certora</span>
+    </div>
+
+    <div class="bottom">
+      <div class="left">
+        the first yield aggregator on <span class="bright">World Chain</span><br>
+        <span style="color: #666666;">built in 36 hours at ETHGlobal Cannes 2026</span>
+      </div>
+      <div class="right">
+        github.com/ElliotFriedman/harvest-world
+      </div>
+    </div>
+  </div>
+</body>
+</html>
