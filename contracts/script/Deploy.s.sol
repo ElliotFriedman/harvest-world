@@ -29,16 +29,6 @@ contract Deploy is Script {
         revert(string.concat("Address not found: ", name));
     }
 
-    /// @dev World ID action name — must match the action created in the Developer Portal.
-    string internal constant WORLD_ID_ACTION = "verify-human";
-
-    /// @dev Compute the World ID external nullifier hash from app_id + action.
-    ///      Formula: hashToField(abi.encodePacked(hashToField(abi.encodePacked(app_id)), action))
-    function _computeExternalNullifierHash(string memory appId) internal pure returns (uint256) {
-        uint256 appIdHash = uint256(keccak256(abi.encodePacked(appId))) >> 8;
-        return uint256(keccak256(abi.encodePacked(appIdHash, WORLD_ID_ACTION))) >> 8;
-    }
-
     function run() external {
         // forge-lint: disable-next-line(unsafe-cheatcode)
         string memory json = vm.readFile("addresses/480.json");
@@ -49,11 +39,6 @@ contract Deploy is Script {
         address merklDistributor = _findAddress(json, "MERKL_DISTRIBUTOR");
         address wld = _findAddress(json, "WLD");
         address uniV3Router = _findAddress(json, "UNISWAP_V3_SWAP_ROUTER_02");
-
-        // Compute World ID external nullifier hash from APP_ID env var
-        string memory appId = vm.envString("APP_ID");
-        uint256 externalNullifierHash = _computeExternalNullifierHash(appId);
-        console.log("ExternalNullifier:", externalNullifierHash);
 
         address[] memory rewards = new address[](1);
         rewards[0] = wld;
@@ -95,8 +80,7 @@ contract Deploy is Script {
             vaultName: "Moo World Morpho USDC",
             vaultSymbol: "mooWorldMorphoUSDC",
             harvestOnDeposit: true,
-            rewards: rewards,
-            externalNullifierHash: externalNullifierHash
+            rewards: rewards
         });
 
         HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);

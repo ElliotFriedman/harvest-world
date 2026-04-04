@@ -23,7 +23,6 @@ contract VerifyDeployment is Script {
     address internal constant MORPHO_RE7_USDC_VAULT = 0xb1E80387EbE53Ff75a89736097D34dC8D9E9045B;
     address internal constant MERKL_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
     address internal constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
-    address internal constant WORLD_ID_ROUTER = 0x17B354dD2595411ff79041f930e491A4Df39A278;
 
     uint256 internal checks;
     uint256 internal passed;
@@ -37,7 +36,6 @@ contract VerifyDeployment is Script {
         _verifyStrategy();
         _verifySwapper();
         _verifyOwnership();
-        _verifyWorldId();
 
         console.log("");
         console.log("========================================");
@@ -123,14 +121,6 @@ contract VerifyDeployment is Script {
 
         _check("vault + strategy same owner", vaultOwner == stratOwner);
         _check("vault + swapper same owner", vaultOwner == swapperOwner);
-        console.log("");
-    }
-
-    function _verifyWorldId() internal view {
-        console.log("[WORLD ID]");
-        uint256 nullifierHash = VAULT.externalNullifierHash();
-        _check("externalNullifierHash != 0", nullifierHash != 0);
-        _log("externalNullifierHash", nullifierHash);
         console.log("");
     }
 

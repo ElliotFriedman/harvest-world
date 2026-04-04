@@ -42,12 +42,6 @@ contract DepositForkTest is Test {
     address internal feeRecipient;
     address internal user;
 
-    /// @dev Directly set verifiedHumans[_user] via vm.store (slot 204).
-    function _setVerifiedInTest(address _user, bool _status) internal {
-        bytes32 slot = keccak256(abi.encode(_user, uint256(204)));
-        vm.store(address(vault), slot, _status ? bytes32(uint256(1)) : bytes32(uint256(0)));
-    }
-
     uint256 internal worldChainFork;
 
     function setUp() public {
@@ -57,23 +51,11 @@ contract DepositForkTest is Test {
 
         user = makeAddr("user");
 
-        // Use deployed contracts if they exist on-chain, otherwise deploy fresh
-        if (DEPLOYED_VAULT.code.length > 0) {
-            vault = BeefyVaultV7(DEPLOYED_VAULT);
-            strategy = StrategyMorphoMerkl(DEPLOYED_STRATEGY);
-            owner = vault.owner();
-        } else {
-            owner = makeAddr("owner");
-            strategist = makeAddr("strategist");
-            feeRecipient = makeAddr("feeRecipient");
-            _deployInfrastructure();
-            vm.startPrank(owner);
-            _deploySystem();
-            vm.stopPrank();
-        }
-
-        // Mark user as verified human (bypass World ID for test)
-        _setVerifiedInTest(user, true);
+        owner = makeAddr("owner");
+        strategist = makeAddr("strategist");
+        feeRecipient = makeAddr("feeRecipient");
+        _deployInfrastructure();
+        _deploySystem();
     }
 
     // ── Infrastructure ────────────────────────────────────────────────────────
@@ -100,8 +82,7 @@ contract DepositForkTest is Test {
             vaultName: "Moo World Morpho USDC",
             vaultSymbol: "mooWorldMorphoUSDC",
             harvestOnDeposit: false,
-            rewards: rewards,
-            externalNullifierHash: 1 // test placeholder
+            rewards: rewards
         });
 
         vm.startPrank(owner);
@@ -151,24 +132,9 @@ contract DepositForkTest is Test {
         assertEq(IERC20(USDC).balanceOf(address(vault)), 0, "vault holds idle USDC");
     }
 
-    /// @dev Unverified user is blocked by onlyHuman.
-    function test_deposit_reverts_for_unverified() public {
-        address stranger = makeAddr("stranger");
-        deal(USDC, stranger, 100e6);
-
-        vm.startPrank(stranger);
-        IERC20(USDC).approve(address(PERMIT2), 100e6);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        PERMIT2.approve(USDC, address(vault), uint160(100e6), uint48(block.timestamp + 1 days));
-        vm.expectRevert("Harvest: humans only");
-        vault.deposit(100e6);
-        vm.stopPrank();
-    }
-
     /// @dev Second depositor gets proportional shares based on current vault NAV.
     function test_deposit_two_users_proportional_shares() public {
         address user2 = makeAddr("user2");
-        _setVerifiedInTest(user2, true);
 
         _depositAs(user, 100e6);
         _depositAs(user2, 50e6);
