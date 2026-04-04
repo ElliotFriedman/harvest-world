@@ -95,9 +95,13 @@ abstract contract BaseTest is Test {
             vaultName: "Moo Morpho USDC", vaultSymbol: "mooMorphoUSDC", harvestOnDeposit: false, rewards: rewards
         });
 
+        // proxyAdmin is a separate EOA — must differ from owner so owner can call vault/strategy functions.
+        // (TransparentUpgradeableProxy blocks implementation calls from the admin address.)
+        address proxyAdmin = makeAddr("proxyAdmin");
+
         // owner becomes msg.sender for all external calls → owner of vault and strategy
         vm.startPrank(owner);
-        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);
+        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params, proxyAdmin);
         vm.stopPrank();
 
         vault = d.vault;

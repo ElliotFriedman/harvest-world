@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {TransparentUpgradeableProxy} from "@openzeppelin-4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {BaseTest} from "../base/BaseTest.sol";
 import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
@@ -141,21 +143,20 @@ contract BeefyVaultV7Test is BaseTest {
         _depositAs(user, 1000e6);
 
         address[] memory noRewards = new address[](0);
+        BaseAllToNativeFactoryStrat.Addresses memory addrs = BaseAllToNativeFactoryStrat.Addresses({
+            want: address(want),
+            depositToken: address(0),
+            vault: address(vault),
+            swapper: address(swapper),
+            strategist: strategist,
+            feeRecipient: feeRecipient
+        });
+        bytes memory initData = abi.encodeCall(
+            StrategyMorphoMerkl.initialize, (address(morphoVault), address(claimer), false, noRewards, addrs)
+        );
         vm.startPrank(owner);
-        StrategyMorphoMerkl newStrat = new StrategyMorphoMerkl();
-        newStrat.initialize(
-            address(morphoVault),
-            address(claimer),
-            false,
-            noRewards,
-            BaseAllToNativeFactoryStrat.Addresses({
-                want: address(want),
-                depositToken: address(0),
-                vault: address(vault),
-                swapper: address(swapper),
-                strategist: strategist,
-                feeRecipient: feeRecipient
-            })
+        StrategyMorphoMerkl newStrat = StrategyMorphoMerkl(
+            payable(new TransparentUpgradeableProxy(address(new StrategyMorphoMerkl()), makeAddr("pa2"), initData))
         );
         vault.setStrategy(IStrategyV7(address(newStrat)));
         vm.stopPrank();

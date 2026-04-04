@@ -11,6 +11,11 @@ contract StrategyMorphoMerkl is BaseAllToNativeFactoryStrat {
     IERC4626 public morphoVault;
     IMerklClaimer public claimer;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _morphoVault,
         address _claimer,

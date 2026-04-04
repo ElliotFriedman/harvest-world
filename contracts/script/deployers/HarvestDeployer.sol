@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {TransparentUpgradeableProxy} from "@openzeppelin-4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {BeefyVaultV7} from "../../src/BeefyVaultV7.sol";
 import {StrategyMorphoMerkl} from "../../src/StrategyMorphoMerkl.sol";
 import {BaseAllToNativeFactoryStrat} from "../../src/BaseAllToNativeFactoryStrat.sol";
@@ -29,14 +31,21 @@ library HarvestDeployer {
         StrategyMorphoMerkl strategy;
     }
 
-    function deploy(ExternalAddresses memory ext, DeployParams memory params) internal returns (Deployment memory d) {
-        // 1. Deploy vault (uninitialized — no strategy yet)
-        d.vault = new BeefyVaultV7();
+    /// @param proxyAdmin Address that controls proxy upgrades (EOA in tests, ProxyAdmin contract in prod).
+    function deploy(ExternalAddresses memory ext, DeployParams memory params, address proxyAdmin)
+        internal
+        returns (Deployment memory d)
+    {
+        // 1. Deploy logic contracts (initializers disabled — cannot be called directly)
+        BeefyVaultV7 vaultImpl = new BeefyVaultV7();
+        StrategyMorphoMerkl stratImpl = new StrategyMorphoMerkl();
 
-        // 2. Deploy strategy
-        d.strategy = new StrategyMorphoMerkl();
+        // 2. Deploy proxies with no init data so both addresses are known before either is initialized.
+        //    This resolves the chicken-and-egg: strategy needs vault address; vault needs strategy address.
+        d.vault = BeefyVaultV7(address(new TransparentUpgradeableProxy(address(vaultImpl), proxyAdmin, "")));
+        d.strategy = StrategyMorphoMerkl(payable(new TransparentUpgradeableProxy(address(stratImpl), proxyAdmin, "")));
 
-        // 3. Initialize strategy
+        // 3. Initialize strategy (vault proxy address is now known)
         BaseAllToNativeFactoryStrat.Addresses memory addrs = BaseAllToNativeFactoryStrat.Addresses({
             want: ext.want,
             depositToken: ext.depositToken,
@@ -47,7 +56,7 @@ library HarvestDeployer {
         });
         d.strategy.initialize(ext.morphoVault, ext.claimer, params.harvestOnDeposit, params.rewards, addrs);
 
-        // 4. Initialize vault
+        // 4. Initialize vault (strategy proxy address is now known)
         d.vault.initialize(IStrategyV7(address(d.strategy)), params.vaultName, params.vaultSymbol);
     }
 }

@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import {IERC4626} from "@openzeppelin-4/contracts/interfaces/IERC4626.sol";
 import {IAllowanceTransfer} from "@permit2/interfaces/IAllowanceTransfer.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {HarvestDeployer} from "../../script/deployers/HarvestDeployer.sol";
 import {BeefyVaultV7} from "../../src/BeefyVaultV7.sol";
@@ -63,8 +64,15 @@ contract HarvestSwapForkTest is Test {
     // ── Setup helpers (used only when deploying fresh) ────────────────────────
 
     function _deploySwapper() internal {
-        swapper = new BeefySwapper();
-        swapper.initialize(address(0), 0);
+        swapper = BeefySwapper(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new BeefySwapper()),
+                    makeAddr("proxyAdmin"),
+                    abi.encodeCall(BeefySwapper.initialize, (address(0), 0))
+                )
+            )
+        );
 
         _setUniV3Route(WLD, WETH, 3000);
         _setUniV3Route(WETH, USDC, 500);
@@ -116,7 +124,7 @@ contract HarvestSwapForkTest is Test {
             rewards: rewards
         });
 
-        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);
+        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params, makeAddr("proxyAdmin"));
         vault = d.vault;
         strategy = d.strategy;
     }

@@ -85,8 +85,9 @@ contract DepositForkTest is Test {
             rewards: rewards
         });
 
+        address proxyAdmin = makeAddr("proxyAdmin");
         vm.startPrank(owner);
-        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params);
+        HarvestDeployer.Deployment memory d = HarvestDeployer.deploy(ext, params, proxyAdmin);
         vm.stopPrank();
 
         vault = d.vault;
