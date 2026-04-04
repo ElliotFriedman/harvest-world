@@ -1,16 +1,17 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-html,
-body {
-  height: 100%;
-  background: #0a0a0a;
-  color: #00ff41;
-  font-family: "Courier New", Courier, monospace;
-  font-size: 13px;
-  line-height: 1.4;
-  overflow: hidden;
+/* ─── Harvest (@docs/brand-book.md) — base layer only; tokens live in tailwind.config.ts */
+
+@layer base {
+  html,
+  body {
+    @apply h-full overflow-hidden bg-terminal-dark text-terminal-green;
+    font-family: var(--font-harvest-loaded, "JetBrains Mono"), "Fira Code", "Courier New",
+      monospace;
+    @apply text-harvest-output;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+  }
 }
