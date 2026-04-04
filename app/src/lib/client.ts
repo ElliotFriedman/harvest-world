@@ -40,6 +40,7 @@ export interface AgentStatus {
   pendingRewards: { token: string; amount: string; usdValue: number } | null;
   nextCheck: string;
   balanceOfPool?: string;
+  streaming?: { lockedUsd: string; unlocksInMs: number } | null;
 }
 
 export interface HarvestResult {
