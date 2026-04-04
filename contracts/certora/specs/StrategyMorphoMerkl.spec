@@ -149,24 +149,14 @@ ghost mathint ghostStrategyMorphoShares {
 }
 
 // =============================================================================
-// INITIALIZATION INVARIANT
+// INITIALIZATION HELPERS
 //
 // StrategyMorphoMerkl inherits OwnableUpgradeable.  Before initialize(),
 // owner==0 and vault==0, creating spurious counterexamples for access-control
-// and accounting rules.
-//
-// We prove strategyInitialized() inductively and require it in all rules.
-// requireInvariant is sound: the prover uses the already-proven invariant.
+// and accounting rules.  We require initialization in each rule directly
+// (upgradeable constructors leave storage zeroed, so an invariant's base case
+// would fail).
 // =============================================================================
-
-invariant strategyInitialized()
-    strat.currentOwner() != 0 && strat.vault() != 0
-    {
-        preserved {
-            require strat.currentOwner() != 0;
-            require strat.vault() != 0;
-        }
-    }
 
 // =============================================================================
 // INVARIANTS
@@ -194,9 +184,10 @@ invariant strategyInitialized()
 // rewards are permanently unclaimed.
 // -----------------------------------------------------------------------------
 rule setClaimerUpdatesStorage(address newClaimer) {
-    requireInvariant strategyInitialized();
     env e;
 
+    require strat.currentOwner() != 0;
+    require strat.vault() != 0;
     address mgr = strat.currentOwner();
     require e.msg.sender == mgr;
     require newClaimer != 0;
@@ -222,7 +213,8 @@ rule setClaimerUpdatesStorage(address newClaimer) {
 // incorrectly — potentially draining the strategy's share position.
 // -----------------------------------------------------------------------------
 rule cannotAddMorphoVaultAsReward() {
-    requireInvariant strategyInitialized();
+    require strat.currentOwner() != 0;
+    require strat.vault() != 0;
     env e;
 
     require strat.morphoVault() == morpho;
@@ -249,7 +241,8 @@ rule cannotAddMorphoVaultAsReward() {
 // reducing deposits on every harvest.
 // -----------------------------------------------------------------------------
 rule cannotAddWantAsReward() {
-    requireInvariant strategyInitialized();
+    require strat.currentOwner() != 0;
+    require strat.vault() != 0;
     env e;
 
     require strat.morphoVault() == morpho;
@@ -275,7 +268,8 @@ rule cannotAddWantAsReward() {
 // Adding it as a reward would cause double-counting in _swapRewardsToNative().
 // -----------------------------------------------------------------------------
 rule cannotAddNativeAsReward() {
-    requireInvariant strategyInitialized();
+    require strat.currentOwner() != 0;
+    require strat.vault() != 0;
     env e;
 
     require strat.morphoVault() == morpho;
