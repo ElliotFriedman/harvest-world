@@ -374,7 +374,7 @@ export default function Terminal() {
       const approveCalldata = encodeFunctionData({
         abi: PERMIT2_APPROVE_ABI,
         functionName: "approve",
-        args: [USDC_ADDRESS, VAULT_ADDRESS, amountRaw, 0],
+        args: [USDC_ADDRESS, VAULT_ADDRESS, amountRaw, Math.floor(Date.now() / 1000) + 86400],
       });
 
       const depositCalldata = encodeFunctionData({
