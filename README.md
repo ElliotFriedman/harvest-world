@@ -59,6 +59,8 @@ This is what "DeFi, for humans" actually means at scale.
 
 **USDC vault only for v1.** Multi-asset, multi-strategy, and risk-profile routing are the roadmap.
 
+**On the roadmap: World ID v4 on-chain verification.** We wanted to enforce humanness maximally by verifying World ID proofs directly on-chain via the World ID Router contract — no backend trust assumption, the vault contract itself rejects non-humans. We built toward this in [#46](https://github.com/ElliotFriedman/harvest-world/pull/46) but ran into World ID v4 / IDKit compatibility constraints during the hackathon and fell back to backend verification. Full on-chain v4 enforcement is the next milestone.
+
 ## Architecture
 
 ```
