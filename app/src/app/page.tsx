@@ -296,13 +296,15 @@ export default function Terminal() {
 
       if (vaultShares > BigInt(0)) setHasShares(true);
 
-      const usdValue = (vaultShares * pricePerShare) / BigInt(1e18);
+      const vaultUsdValue = (vaultShares * pricePerShare) / BigInt(1e18);
+      const totalUsdValue = usdcBalance + vaultUsdValue;
 
       print(
         `Portfolio for ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
         `  USDC in wallet: $${formatBigintUSDC(usdcBalance)}`,
         `  Vault shares:   ${formatBigintUSDC(vaultShares)} hvUSDC`,
-        `  USD value:      $${formatBigintUSDC(usdValue)}`,
+        `  Vault USD value: $${formatBigintUSDC(vaultUsdValue)}`,
+        `  Total USD value: $${formatBigintUSDC(totalUsdValue)}`,
         ""
       );
     } catch {
