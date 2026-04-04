@@ -321,8 +321,8 @@ We wrote Certora Prover specs (CVL2) for the 3 core contracts. Formal verificati
 
 | Contract | Spec | Passing | Dashboard |
 |----------|------|---------|-----------|
-| `BeefyVaultV7` | `certora/specs/BeefyVaultV7.spec` | **15/15** | [Certora Report](https://prover.certora.com/output/651303/555fa8a141fe4d66a89f42ff4f3c3fa7) |
-| `BaseAllToNativeFactoryStrat` | `certora/specs/BaseStrategy.spec` | **10/10** | [Certora Report](https://prover.certora.com/output/651303/e0dcd216e12045a89c7ae1f0ea20aa06) |
+| `BeefyVaultV7` | `certora/specs/BeefyVaultV7.spec` | **15/15** | [Certora Report](https://prover.certora.com/output/651303/496832330da84903aebb2e06001116bd?anonymousKey=e0cc398a4f028ec7d493cbdbf5c4938ad2a6fb6e) |
+| `BaseAllToNativeFactoryStrat` | `certora/specs/BaseStrategy.spec` | **10/10** | [Certora Report](https://prover.certora.com/output/651303/96851137a8f04b30a2b5a2aa845711a8?anonymousKey=bf48592a43f3083fe687d9db12f2971fb14ff264) |
 | `StrategyMorphoMerkl` | `certora/specs/StrategyMorphoMerkl.spec` | **5/5** | |
 
 Key properties proven: share minting/burning correctness, deposit-withdraw round-trip safety, price-per-share monotonicity under yield, locked profit decay, manager/owner access control, reward token safety.
