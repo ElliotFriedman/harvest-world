@@ -53,19 +53,11 @@ contract HarvestSwapForkTest is Test {
 
         user = makeAddr("user");
 
-        // Use deployed contracts if they exist on-chain, otherwise deploy fresh
-        if (DEPLOYED_VAULT.code.length > 0) {
-            vault = BeefyVaultV7(DEPLOYED_VAULT);
-            strategy = StrategyMorphoMerkl(DEPLOYED_STRATEGY);
-            swapper = BeefySwapper(DEPLOYED_SWAPPER);
-            owner = vault.owner();
-        } else {
-            owner = makeAddr("owner");
-            vm.startPrank(owner);
-            _deploySwapper();
-            _deploySystem();
-            vm.stopPrank();
-        }
+        owner = makeAddr("owner");
+        vm.startPrank(owner);
+        _deploySwapper();
+        _deploySystem();
+        vm.stopPrank();
     }
 
     // ── Setup helpers (used only when deploying fresh) ────────────────────────

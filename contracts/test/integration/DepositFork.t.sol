@@ -51,20 +51,11 @@ contract DepositForkTest is Test {
 
         user = makeAddr("user");
 
-        // Use deployed contracts if they exist on-chain, otherwise deploy fresh
-        if (DEPLOYED_VAULT.code.length > 0) {
-            vault = BeefyVaultV7(DEPLOYED_VAULT);
-            strategy = StrategyMorphoMerkl(DEPLOYED_STRATEGY);
-            owner = vault.owner();
-        } else {
-            owner = makeAddr("owner");
-            strategist = makeAddr("strategist");
-            feeRecipient = makeAddr("feeRecipient");
-            _deployInfrastructure();
-            vm.startPrank(owner);
-            _deploySystem();
-            vm.stopPrank();
-        }
+        owner = makeAddr("owner");
+        strategist = makeAddr("strategist");
+        feeRecipient = makeAddr("feeRecipient");
+        _deployInfrastructure();
+        _deploySystem();
     }
 
     // ── Infrastructure ────────────────────────────────────────────────────────
