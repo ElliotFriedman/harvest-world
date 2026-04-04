@@ -31,24 +31,21 @@ export async function getVaultTvl(): Promise<bigint> {
 
 // ─── Agent / Harvester ──────────────────────────────────────────────────────
 
-export interface HarvestRecord {
-  timestamp: string;
-  txHash: string;
-  wantEarned: string;
-  rewardsClaimed: string;
-}
+export type { HarvestRecord } from "./harvester";
 
 export interface AgentStatus {
   status: "active" | "idle";
-  lastHarvest: HarvestRecord | null;
-  harvests: HarvestRecord[];
+  lastHarvest: import("./harvester").HarvestRecord | null;
+  harvests: import("./harvester").HarvestRecord[];
   pendingRewards: { token: string; amount: string; usdValue: number } | null;
   nextCheck: string;
+  balanceOfPool?: string;
 }
 
 export interface HarvestResult {
   success: boolean;
   txHash?: string;
+  claimTxHash?: string;
   rewardsClaimed?: string;
   wantEarned?: string;
   newSharePrice?: string;
@@ -65,5 +62,9 @@ export async function getAgentStatus(): Promise<AgentStatus> {
 
 export async function triggerHarvest(): Promise<HarvestResult> {
   const res = await fetch("/api/agent/harvest", { method: "POST" });
-  return res.json();
+  try {
+    return await res.json();
+  } catch {
+    return { success: false, reason: "tx_failed", message: `HTTP ${res.status}` };
+  }
 }

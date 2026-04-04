@@ -107,7 +107,7 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v1.1 — Agentic DeFi, for humans.",
+    "HARVEST v1.2 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
@@ -420,8 +420,6 @@ export default function Terminal() {
           print("        No unclaimed rewards found.", "");
         } else if (result.reason === "missing_key") {
           print("        Agent wallet not configured.", "");
-        } else if (result.reason === "below_threshold") {
-          print("        Rewards below harvest threshold.", "");
         } else {
           print(`        Error: ${result.message ?? "harvest failed"}`, "");
         }
@@ -434,10 +432,14 @@ export default function Terminal() {
 
       // Share price change
       if (result.oldSharePrice && result.newSharePrice) {
-        const oldP = Number(BigInt(result.oldSharePrice)) / 1e18;
-        const newP = Number(BigInt(result.newSharePrice)) / 1e18;
+        const fmtPrice = (raw: string) => {
+          const bi = BigInt(raw);
+          const whole = bi / BigInt(1e18);
+          const frac = (bi % BigInt(1e18)).toString().padStart(18, "0").slice(0, 6);
+          return `${whole}.${frac}`;
+        };
         print("");
-        print(`  Share price: ${oldP.toFixed(6)} -> ${newP.toFixed(6)}`);
+        print(`  Share price: ${fmtPrice(result.oldSharePrice)} -> ${fmtPrice(result.newSharePrice)}`);
       }
 
       print("  Next harvest in ~6h.", "");
@@ -484,18 +486,11 @@ export default function Terminal() {
       }
 
       try {
-        // Debug: show raw result structure
-        print(`IDKit result keys: ${JSON.stringify(Object.keys(result))}`);
-        print(`Responses count: ${result.responses?.length ?? "undefined"}`);
-
         const response = result.responses[0];
         if (!response) {
           print("Error: No credential response from World ID.", "");
-          print(`Full result: ${JSON.stringify(result).slice(0, 200)}`);
           return;
         }
-
-        print(`Response keys: ${JSON.stringify(Object.keys(response))}`);
 
         let root: bigint;
         let nullifierHash: bigint;
@@ -508,7 +503,6 @@ export default function Terminal() {
           nullifierHash = BigInt(v3.nullifier);
           const decoded = decodeProof(v3.proof);
           proofArray = decoded.map((d) => BigInt(d)) as unknown as typeof proofArray;
-          print(`V3 format — root: ${root.toString().slice(0, 10)}...`);
         } else if ("nullifier" in response) {
           const v4 = response as ResponseItemV4;
           root = BigInt(v4.proof[4]);
@@ -516,10 +510,8 @@ export default function Terminal() {
           const elements = v4.proof.slice(0, 4).map((p) => BigInt(p));
           while (elements.length < 8) elements.push(BigInt(0));
           proofArray = elements as unknown as typeof proofArray;
-          print(`V4 format — root: ${root.toString().slice(0, 10)}...`);
         } else {
           print("Error: Unsupported proof format.", "");
-          print(`Response: ${JSON.stringify(response).slice(0, 200)}`);
           return;
         }
 
@@ -538,8 +530,6 @@ export default function Terminal() {
             },
           ],
         });
-
-        print(`sendTransaction result: ${JSON.stringify(data).slice(0, 200)}`);
 
         if (data.status !== "success") {
           print(`Error: tx failed — status=${data.status}`, "");
