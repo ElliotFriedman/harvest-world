@@ -164,21 +164,21 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
 - [ ] **Configure Vercel environment variables**
   - Required variables (set in Vercel Dashboard > Project > Settings > Environment Variables):
     ```
-    NEXT_PUBLIC_APP_ID=app_xxxxxxxxxx          # From Developer Portal
-    NEXT_PUBLIC_WORLD_CHAIN_ID=480             # World Chain mainnet
-    NEXT_PUBLIC_ALCHEMY_RPC=https://worldchain-mainnet.g.alchemy.com/v2/YOUR_KEY
-    
-    # World Developer Portal
-    DEV_PORTAL_API_KEY=your_api_key            # For notification sending & verification
-    
-    # Contract addresses (add after deployment)
-    NEXT_PUBLIC_VAULT_CONTRACT=0x...
-    NEXT_PUBLIC_STRATEGY_CONTRACT=0x...
-    
-    # Optional
-    OPENAI_API_KEY=sk-...
-    ALCHEMY_API_KEY=your_key
+    # World App (Developer Portal → Configuration)
+    NEXT_PUBLIC_APP_ID=app_...           # Mini App ID
+    WORLD_RP_ID=rp_...                   # RP ID for IDKit
+    RP_SIGNING_KEY=0x...                 # Server-only signing key (never expose to browser)
+
+    # Contracts — World Chain mainnet (chainId 480)
+    NEXT_PUBLIC_VAULT_ADDRESS=0x512ce44e4f69a98bc42a57ced8257e65e63cd74f  # Harvest vault proxy
+
+    # RPC — server-only (used by /api/balances)
+    RPC_URL=https://worldchain-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY
+
+    # Agent wallet — server-only (used by /api/agent/harvest)
+    AGENT_PRIVATE_KEY=0x...
     ```
+  - See `app/.env.example` for the full reference with comments.
   - Time: 15 minutes
   - Blocking: Functional deployment
   - Who: Frontend dev
