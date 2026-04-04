@@ -330,3 +330,7 @@ We used first-party AI tooling from both prize sponsors as active development in
 # Uniswap AI skill used during development
 npx skills add uniswap/uniswap-ai --skill swap-integration
 ```
+
+---
+
+*There's at least one easter egg hidden in the terminal. You'll know it when you find it.*
