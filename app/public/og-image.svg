@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- CRT Phosphor glow -->
+    <filter id="ogGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Heavy bloom for main title -->
+    <filter id="ogBloom" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="bigBlur"/>
+      <feColorMatrix in="bigBlur" type="matrix"
+        values="0 0 0 0 0
+                0 1 0 0 0
+                0 0 0 0 0
+                0 0 0 0.35 0"/>
+    </filter>
+    <!-- Amber glow -->
+    <filter id="ogAmber" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Scanlines -->
+    <pattern id="ogScanlines" patternUnits="userSpaceOnUse" width="1200" height="4">
+      <rect width="1200" height="2" fill="transparent"/>
+      <rect y="2" width="1200" height="2" fill="#000000" opacity="0.07"/>
+    </pattern>
+    <!-- CRT vignette -->
+    <radialGradient id="ogVignette" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0a0a0a" stop-opacity="0"/>
+      <stop offset="75%" stop-color="#0a0a0a" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.7"/>
+    </radialGradient>
+    <!-- Subtle screen warmth -->
+    <radialGradient id="ogScreenGlow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#001200" stop-opacity="1"/>
+      <stop offset="50%" stop-color="#0a0a0a" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#050505" stop-opacity="1"/>
+    </radialGradient>
+    <!-- CRT bezel shadow (inner) -->
+    <filter id="innerShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="15" result="shadow"/>
+      <feOffset dx="0" dy="0"/>
+      <feComposite in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1"/>
+      <feFlood flood-color="#000000" flood-opacity="0.5"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+    </filter>
+  </defs>
+
+  <!-- CRT bezel (outer frame) -->
+  <rect width="1200" height="630" fill="#060606"/>
+
+  <!-- CRT screen area with slight inset -->
+  <rect x="20" y="16" width="1160" height="598" rx="8" ry="8" fill="url(#ogScreenGlow)"/>
+
+  <!-- Scanlines across screen -->
+  <rect x="20" y="16" width="1160" height="598" rx="8" ry="8" fill="url(#ogScanlines)"/>
+
+  <!-- Bloom behind main title -->
+  <text x="600" y="240" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="72" font-weight="700" fill="#00ff00" filter="url(#ogBloom)">&gt; harvest_</text>
+
+  <!-- Main title -->
+  <text x="600" y="240" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="72" font-weight="700" fill="#00ff00" filter="url(#ogGlow)">&gt; harvest_</text>
+
+  <!-- Tagline in amber -->
+  <text x="600" y="310" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="32" font-weight="400" fill="#f5a623" filter="url(#ogAmber)">DeFi, for humans.</text>
+
+  <!-- Subline in dim green -->
+  <text x="600" y="370" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="20" font-weight="400" fill="#00aa00">The first yield aggregator on World Chain</text>
+
+  <!-- Horizontal rule -->
+  <line x1="420" y1="410" x2="780" y2="410" stroke="#333333" stroke-width="1"/>
+
+  <!-- Bottom line -->
+  <text x="600" y="450" text-anchor="middle" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace" font-size="14" font-weight="400" fill="#666666">Built at ETHGlobal Cannes 2026</text>
+
+  <!-- CRT vignette overlay -->
+  <rect x="20" y="16" width="1160" height="598" rx="8" ry="8" fill="url(#ogVignette)"/>
+
+  <!-- Top bezel highlight line (simulates glass reflection) -->
+  <line x1="60" y1="20" x2="1140" y2="20" stroke="#1a1a1a" stroke-width="1" opacity="0.5"/>
+</svg>
