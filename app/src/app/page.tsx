@@ -337,11 +337,16 @@ export default function Terminal() {
         ? `${s.pendingRewards.amount} ($${s.pendingRewards.usdValue.toFixed(2)})`
         : "0 WLD";
 
+      const swapEstimate = (s as any).uniswapQuote
+        ? `~${(s as any).uniswapQuote.expectedOutput} (impact: ${(s as any).uniswapQuote.priceImpact}%)`
+        : "";
+
       print(
         "HARVESTER AGENT",
         `  Status:         ● ${s.status.toUpperCase()}`,
         `  Pool balance:   ${poolUSD}`,
         `  Pending yield:  ${rewardStr}`,
+        ...(swapEstimate ? [`  Swap estimate:  ${swapEstimate}`] : []),
         `  Last harvest:   ${lastHarvestStr}`,
         `  Next check:     ${nextCheckStr}`,
         ""
@@ -356,10 +361,14 @@ export default function Terminal() {
     try {
       const result = await triggerHarvest();
       if (result.success) {
+        const quoteLine = (result as any).uniswapQuote
+          ? `  Swap quote:    ${(result as any).uniswapQuote.expectedOutput} (via Uniswap ${(result as any).uniswapQuote.routing})`
+          : "";
         print(
           "Harvest complete.",
           result.wantEarned ? `  Yield earned:  +$${result.wantEarned}` : "",
           result.rewardsClaimed ? `  Rewards:       ${result.rewardsClaimed}` : "",
+          ...(quoteLine ? [quoteLine] : []),
           result.txHash ? `  Tx: ${result.txHash.slice(0, 10)}...` : "",
           ""
         );
