@@ -314,24 +314,34 @@ export default function Terminal() {
     print("Loading agent status...");
     try {
       const s = await getAgentStatus();
-      const lastTime = s.lastHarvest
-        ? new Date(s.lastHarvest.timestamp).toLocaleString()
+
+      const lastHarvestStr = s.lastHarvest
+        ? `${new Date(s.lastHarvest.timestamp).toLocaleString()} (+$${s.lastHarvest.wantEarned})`
         : "never";
-      const nextTime = new Date(s.nextCheck).toLocaleString();
-      const poolUsdc = s.balanceOfPool
-        ? `$${(Number(s.balanceOfPool) / 1e6).toFixed(2)}`
-        : "unknown";
-      const pending = s.pendingRewards
-        ? `${s.pendingRewards.amount} ($${s.pendingRewards.usdValue})`
-        : "none";
+
+      const nextCheckStr = (() => {
+        const ms = new Date(s.nextCheck).getTime() - Date.now();
+        if (ms <= 0) return "soon";
+        const h = Math.floor(ms / 3600_000);
+        const m = Math.floor((ms % 3600_000) / 60_000);
+        return h > 0 ? `in ~${h}h` : `in ~${m}m`;
+      })();
+
+      const poolUSD = s.balanceOfPool
+        ? `$${(Number(s.balanceOfPool) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : "--";
+
+      const rewardStr = s.pendingRewards
+        ? `${s.pendingRewards.amount} ($${s.pendingRewards.usdValue.toFixed(2)})`
+        : "0 WLD";
 
       print(
         "HARVESTER AGENT",
         `  Status:         ● ${s.status.toUpperCase()}`,
-        `  Pool balance:   ${poolUsdc}`,
-        `  Last harvest:   ${lastTime}`,
-        `  Next check:     ${nextTime}`,
-        `  Pending yield:  ${pending}`,
+        `  Pool balance:   ${poolUSD}`,
+        `  Pending yield:  ${rewardStr}`,
+        `  Last harvest:   ${lastHarvestStr}`,
+        `  Next check:     ${nextCheckStr}`,
         ""
       );
     } catch {
@@ -340,23 +350,20 @@ export default function Terminal() {
   }
 
   async function handleAgentHarvest() {
-    print("Triggering manual harvest...");
+    print("Triggering harvest...");
     try {
       const result = await triggerHarvest();
       if (result.success) {
         print(
-          "Harvest complete!",
-          `  Rewards claimed: ${result.rewardsClaimed ?? "—"}`,
-          `  Want earned:     ${result.wantEarned ?? "—"}`,
-          `  Tx: ${result.txHash?.slice(0, 10)}...`,
+          "Harvest complete.",
+          result.wantEarned ? `  Yield earned:  +$${result.wantEarned}` : "",
+          result.rewardsClaimed ? `  Rewards:       ${result.rewardsClaimed}` : "",
+          result.txHash ? `  Tx: ${result.txHash.slice(0, 10)}...` : "",
           ""
         );
       } else {
-        print(
-          `Harvest skipped: ${result.reason ?? "unknown"}`,
-          result.message ?? "",
-          ""
-        );
+        const reason = result.message ?? result.reason ?? "unknown";
+        print(`Harvest skipped: ${reason}`, "");
       }
     } catch {
       print("Error triggering harvest. Try again.", "");

@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 export const STRATEGY_ADDRESS = (
-  process.env.NEXT_PUBLIC_STRATEGY_ADDRESS ?? "0x313ba1d5d5aa1382a80ba839066a61d33c110489"
+  process.env.NEXT_PUBLIC_STRATEGY_ADDRESS ?? "0x313bA1D5D5AA1382a80BA839066A61d33C110489"
 ) as `0x${string}`;
 export const VAULT_ADDRESS = (
   process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? "0x512ce44e4f69a98bc42a57ced8257e65e63cd74f"
