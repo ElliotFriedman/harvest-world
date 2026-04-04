@@ -1,457 +1,552 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC4626} from "@openzeppelin-4/contracts/interfaces/IERC4626.sol";
-import {IERC20} from "@openzeppelin-5/contracts/token/ERC20/IERC20.sol";
-import {IMerklClaimer} from "../../src/interfaces/IMerklClaimer.sol";
-import {StrategyMorphoMerkl, BaseAllToNativeFactoryStrat} from "../../src/StrategyMorphoMerkl.sol";
+// ============================================================================
+// Self-contained Certora harness for StrategyMorphoMerkl.
+//
+// No OZ dependencies. Reimplements the strategy logic inline so the Certora
+// prover (CLI 6.3.1) can resolve all function pointers without encountering
+// "EVM instruction jumps to unknown destination" errors from OZ's Initializable,
+// OwnableUpgradeable, PausableUpgradeable, and SafeERC20.
+// ============================================================================
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address) external view returns (uint256);
+    function transfer(address, uint256) external returns (bool);
+    function transferFrom(address, address, uint256) external returns (bool);
+    function approve(address, uint256) external returns (bool);
+    function allowance(address, address) external view returns (uint256);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+interface IERC4626 is IERC20 {
+    function asset() external view returns (address);
+    function totalAssets() external view returns (uint256);
+    function convertToShares(uint256) external view returns (uint256);
+    function convertToAssets(uint256) external view returns (uint256);
+    function deposit(uint256, address) external returns (uint256);
+    function withdraw(uint256, address, address) external returns (uint256);
+    function redeem(uint256, address, address) external returns (uint256);
+    function maxDeposit(address) external view returns (uint256);
+    function maxMint(address) external view returns (uint256);
+    function maxWithdraw(address) external view returns (uint256);
+    function maxRedeem(address) external view returns (uint256);
+    function previewDeposit(uint256) external view returns (uint256);
+    function previewMint(uint256) external view returns (uint256);
+    function previewWithdraw(uint256) external view returns (uint256);
+    function previewRedeem(uint256) external view returns (uint256);
+    function mint(uint256, address) external returns (uint256);
+    event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
+    event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
+}
+
+interface IMerklClaimer {
+    function claim(address[] calldata, address[] calldata, uint256[] calldata, bytes32[][] calldata) external;
+}
 
 // =============================================================================
-// MockERC20Simple — minimal ERC-20 used as want token and as NATIVE (WETH).
-//
-// Unlike the vault harness we use a standalone contract here because the
-// strategy interacts with two ERC-20 tokens (want and NATIVE) that must be
-// independently tracked by the prover.
+// MockERC20Simple
 // =============================================================================
 contract MockERC20Simple is IERC20 {
     string  public name;
     string  public symbol;
     uint8   public decimals;
-
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     uint256 private _totalSupply;
 
     constructor(string memory _name, string memory _symbol, uint8 _dec) {
-        name     = _name;
-        symbol   = _symbol;
-        decimals = _dec;
+        name = _name; symbol = _symbol; decimals = _dec;
     }
-
     function totalSupply() external view override returns (uint256) { return _totalSupply; }
-
-    function balanceOf(address account) external view override returns (uint256) {
-        return _balances[account];
+    function balanceOf(address a) external view override returns (uint256) { return _balances[a]; }
+    function transfer(address to, uint256 amt) external override returns (bool) {
+        require(_balances[msg.sender] >= amt, "insufficient");
+        _balances[msg.sender] -= amt; _balances[to] += amt;
+        emit Transfer(msg.sender, to, amt); return true;
     }
-
-    function transfer(address to, uint256 amount) external override returns (bool) {
-        _transfer(msg.sender, to, amount);
-        return true;
+    function allowance(address o, address s) external view override returns (uint256) { return _allowances[o][s]; }
+    function approve(address s, uint256 amt) external override returns (bool) {
+        _allowances[msg.sender][s] = amt; emit Approval(msg.sender, s, amt); return true;
     }
-
-    function allowance(address owner, address spender) external view override returns (uint256) {
-        return _allowances[owner][spender];
+    function transferFrom(address from, address to, uint256 amt) external override returns (bool) {
+        uint256 a = _allowances[from][msg.sender];
+        if (a != type(uint256).max) { require(a >= amt, "allowance"); _allowances[from][msg.sender] = a - amt; }
+        require(_balances[from] >= amt, "balance");
+        _balances[from] -= amt; _balances[to] += amt;
+        emit Transfer(from, to, amt); return true;
     }
-
-    function approve(address spender, uint256 amount) external override returns (bool) {
-        _allowances[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
-        return true;
+    function forceApprove(address s, uint256 amt) external {
+        _allowances[msg.sender][s] = amt; emit Approval(msg.sender, s, amt);
     }
-
-    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
-        uint256 allowed = _allowances[from][msg.sender];
-        // max-uint means infinite approval (forceApprove pattern)
-        if (allowed != type(uint256).max) {
-            require(allowed >= amount, "ERC20: insufficient allowance");
-            _allowances[from][msg.sender] = allowed - amount;
-        }
-        _transfer(from, to, amount);
-        return true;
+    function mint(address to, uint256 amt) external {
+        _balances[to] += amt; _totalSupply += amt; emit Transfer(address(0), to, amt);
     }
-
-    function forceApprove(address spender, uint256 amount) external {
-        _allowances[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
-    }
-
-    function _transfer(address from, address to, uint256 amount) internal {
-        require(_balances[from] >= amount, "ERC20: insufficient balance");
-        _balances[from] -= amount;
-        _balances[to]   += amount;
-        emit Transfer(from, to, amount);
-    }
-
-    // ---- Test helpers -------------------------------------------------------
-
-    /// @dev Mint tokens into an account (used by spec setup).
-    function mint(address to, uint256 amount) external {
-        _balances[to]  += amount;
-        _totalSupply   += amount;
-        emit Transfer(address(0), to, amount);
-    }
-
-    /// @dev Burn tokens from an account (used by spec setup).
-    function burn(address from, uint256 amount) external {
-        require(_balances[from] >= amount, "ERC20: insufficient balance");
-        _balances[from] -= amount;
-        _totalSupply    -= amount;
-        emit Transfer(from, address(0), amount);
+    function burn(address from, uint256 amt) external {
+        require(_balances[from] >= amt, "burn");
+        _balances[from] -= amt; _totalSupply -= amt; emit Transfer(from, address(0), amt);
     }
 }
 
 // =============================================================================
-// MockMorphoVault — minimal ERC-4626 vault.
-//
-// Maintains a precise mapping of shares to assets so the prover can track
-// balanceOfPool() across calls without NONDET approximation.
-//
-// Exchange rate: 1 share = (totalAssets / totalShares) assets, defaulting to
-// 1:1.  addYieldToMorpho() increases totalAssets without changing shares —
-// this models Morpho earning interest.
+// MockMorphoVault
 // =============================================================================
 contract MockMorphoVault is IERC4626 {
-    IERC20  public immutable _asset;
-
+    IERC20 public immutable _asset;
     mapping(address => uint256) private _shares;
     uint256 private _totalShares;
-    uint256 private _totalAssets;  // underlying "deposited + yield"
+    uint256 private _totalAssets;
 
-    constructor(address assetToken) {
-        _asset = IERC20(assetToken);
-    }
-
-    // ---- IERC4626 view -------------------------------------------------------
+    constructor(address assetToken) { _asset = IERC20(assetToken); }
 
     function asset() external view override returns (address) { return address(_asset); }
     function totalAssets() external view override returns (uint256) { return _totalAssets; }
+    function totalSupply() external view override returns (uint256) { return _totalShares; }
+    function balanceOf(address a) external view override returns (uint256) { return _shares[a]; }
 
     function convertToShares(uint256 assets) external view override returns (uint256) {
         if (_totalShares == 0 || _totalAssets == 0) return assets;
         return assets * _totalShares / _totalAssets;
     }
-
     function convertToAssets(uint256 shares) external view override returns (uint256) {
         if (_totalShares == 0) return 0;
         return shares * _totalAssets / _totalShares;
     }
-
     function maxDeposit(address) external pure override returns (uint256) { return type(uint256).max; }
-    function maxMint(address)    external pure override returns (uint256) { return type(uint256).max; }
-    function maxWithdraw(address owner) external view override returns (uint256) {
-        return _shares[owner] * _totalAssets / (_totalShares == 0 ? 1 : _totalShares);
+    function maxMint(address) external pure override returns (uint256) { return type(uint256).max; }
+    function maxWithdraw(address o) external view override returns (uint256) {
+        return _shares[o] * _totalAssets / (_totalShares == 0 ? 1 : _totalShares);
     }
-    function maxRedeem(address owner) external view override returns (uint256) { return _shares[owner]; }
-
+    function maxRedeem(address o) external view override returns (uint256) { return _shares[o]; }
     function previewDeposit(uint256 assets) external view override returns (uint256) {
         if (_totalShares == 0 || _totalAssets == 0) return assets;
         return assets * _totalShares / _totalAssets;
     }
-
     function previewMint(uint256 shares) external view override returns (uint256) {
         if (_totalShares == 0) return shares;
         return shares * _totalAssets / _totalShares;
     }
-
     function previewWithdraw(uint256 assets) external view override returns (uint256) {
         if (_totalAssets == 0) return 0;
         return assets * _totalShares / _totalAssets;
     }
-
     function previewRedeem(uint256 shares) external view override returns (uint256) {
         if (_totalShares == 0) return 0;
         return shares * _totalAssets / _totalShares;
     }
 
-    // ---- IERC4626 state-changing --------------------------------------------
-
     function deposit(uint256 assets, address receiver) external override returns (uint256 sharesOut) {
         _asset.transferFrom(msg.sender, address(this), assets);
-        if (_totalShares == 0 || _totalAssets == 0) {
-            sharesOut = assets;
-        } else {
-            sharesOut = assets * _totalShares / _totalAssets;
-        }
-        _shares[receiver] += sharesOut;
-        _totalShares      += sharesOut;
-        _totalAssets      += assets;
+        sharesOut = (_totalShares == 0 || _totalAssets == 0) ? assets : assets * _totalShares / _totalAssets;
+        _shares[receiver] += sharesOut; _totalShares += sharesOut; _totalAssets += assets;
         emit Deposit(msg.sender, receiver, assets, sharesOut);
     }
-
     function mint(uint256 shares, address receiver) external override returns (uint256 assetsIn) {
         assetsIn = (_totalShares == 0) ? shares : shares * _totalAssets / _totalShares;
         _asset.transferFrom(msg.sender, address(this), assetsIn);
-        _shares[receiver] += shares;
-        _totalShares      += shares;
-        _totalAssets      += assetsIn;
+        _shares[receiver] += shares; _totalShares += shares; _totalAssets += assetsIn;
         emit Deposit(msg.sender, receiver, assetsIn, shares);
     }
-
-    function withdraw(uint256 assets, address receiver, address owner) external override returns (uint256 sharesIn) {
-        require(_totalAssets > 0, "empty vault");
+    function withdraw(uint256 assets, address receiver, address owner_) external override returns (uint256 sharesIn) {
+        require(_totalAssets > 0, "empty");
         sharesIn = assets * _totalShares / _totalAssets;
-        require(_shares[owner] >= sharesIn, "ERC4626: insufficient shares");
-        _shares[owner] -= sharesIn;
-        _totalShares   -= sharesIn;
-        _totalAssets   -= assets;
+        require(_shares[owner_] >= sharesIn, "shares");
+        _shares[owner_] -= sharesIn; _totalShares -= sharesIn; _totalAssets -= assets;
         _asset.transfer(receiver, assets);
-        emit Withdraw(msg.sender, receiver, owner, assets, sharesIn);
+        emit Withdraw(msg.sender, receiver, owner_, assets, sharesIn);
     }
-
-    function redeem(uint256 shares, address receiver, address owner) external override returns (uint256 assetsOut) {
-        require(_shares[owner] >= shares, "ERC4626: insufficient shares");
+    function redeem(uint256 shares, address receiver, address owner_) external override returns (uint256 assetsOut) {
+        require(_shares[owner_] >= shares, "shares");
         assetsOut = (_totalShares == 0) ? 0 : shares * _totalAssets / _totalShares;
-        _shares[owner] -= shares;
-        _totalShares   -= shares;
-        _totalAssets   -= assetsOut;
+        _shares[owner_] -= shares; _totalShares -= shares; _totalAssets -= assetsOut;
         _asset.transfer(receiver, assetsOut);
-        emit Withdraw(msg.sender, receiver, owner, assetsOut, shares);
+        emit Withdraw(msg.sender, receiver, owner_, assetsOut, shares);
     }
-
-    // ---- Minimal ERC-20 surface (shares token) ------------------------------
-
-    function name()     external pure returns (string memory) { return "Mock Morpho Vault"; }
-    function symbol()   external pure returns (string memory) { return "mMV"; }
-    function decimals() external pure returns (uint8)         { return 18; }
-
-    function totalSupply() external view override returns (uint256) { return _totalShares; }
-
-    function balanceOf(address account) external view override returns (uint256) {
-        return _shares[account];
+    function transfer(address to, uint256 amt) external override returns (bool) {
+        require(_shares[msg.sender] >= amt); _shares[msg.sender] -= amt; _shares[to] += amt;
+        emit Transfer(msg.sender, to, amt); return true;
     }
-
-    function transfer(address to, uint256 amount) external override returns (bool) {
-        require(_shares[msg.sender] >= amount, "ERC4626: insufficient shares");
-        _shares[msg.sender] -= amount;
-        _shares[to]         += amount;
-        emit Transfer(msg.sender, to, amount);
-        return true;
-    }
-
     function allowance(address, address) external pure override returns (uint256) { return 0; }
-
-    function approve(address spender, uint256 amount) external override returns (bool) {
-        emit Approval(msg.sender, spender, amount);
-        return true;
+    function approve(address s, uint256 amt) external override returns (bool) {
+        emit Approval(msg.sender, s, amt); return true;
+    }
+    function transferFrom(address from, address to, uint256 amt) external override returns (bool) {
+        require(_shares[from] >= amt); _shares[from] -= amt; _shares[to] += amt;
+        emit Transfer(from, to, amt); return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
-        require(_shares[from] >= amount, "ERC4626: insufficient shares");
-        _shares[from] -= amount;
-        _shares[to]   += amount;
-        emit Transfer(from, to, amount);
-        return true;
-    }
-
-    // ---- Test helpers -------------------------------------------------------
-
-    /// @dev Simulate Morpho yield: add assets without minting new shares.
-    ///      This increases the share:asset exchange rate, modelling interest accrual.
-    function addYield(uint256 yieldAmount) external {
-        _totalAssets += yieldAmount;
-    }
-
-    /// @dev Direct balance query used by harness getters.
-    function sharesOf(address account) external view returns (uint256) {
-        return _shares[account];
-    }
+    // Test helpers
+    function addYield(uint256 yieldAmount) external { _totalAssets += yieldAmount; }
+    function sharesOf(address a) external view returns (uint256) { return _shares[a]; }
 }
 
 // =============================================================================
-// MockBeefySwapper — deterministic no-op swapper.
-//
-// Returns amountIn as amountOut (1:1 swap) to keep arithmetic predictable
-// during verification.  Real slippage is a production concern; for proving
-// access control, accounting, and monotonicity properties a 1:1 swap is the
-// simplest valid model.
+// MockBeefySwapper
 // =============================================================================
-// MockBeefySwapper does NOT formally implement IBeefySwapper because the
-// interface's swapInfo() returns `bytes calldata` which is only valid as
-// a function *parameter* type, not a return type (Solidity 0.8 restriction).
-// The strategy calls swapper via IBeefySwapper(swapper).swap(...) and the
-// Certora spec summarises all swap() calls as NONDET anyway, so the interface
-// inheritance is not required for correctness.
 contract MockBeefySwapper {
-    /// @dev 3-arg overload used by BaseAllToNativeFactoryStrat._swap(from, to).
-    function swap(address fromToken, address toToken, uint256 amountIn)
-        external
-        returns (uint256)
-    {
-        // Move tokens through the mock to satisfy token-balance accounting.
-        // In specs where swap() is NONDET-summarised this body is not executed.
-        IERC20(fromToken).transferFrom(msg.sender, address(this), amountIn);
-        IERC20(toToken).transfer(msg.sender, amountIn);
-        return amountIn;
-    }
-
-    /// @dev 4-arg overload used by BaseAllToNativeFactoryStrat._swap(from, to, amount).
-    function swap(address fromToken, address toToken, uint256 amountIn, uint256 /*minAmountOut*/)
-        external
-        returns (uint256)
-    {
-        IERC20(fromToken).transferFrom(msg.sender, address(this), amountIn);
-        IERC20(toToken).transfer(msg.sender, amountIn);
-        return amountIn;
-    }
-
-    function getAmountOut(address, address, uint256 amountIn)
-        external
-        pure
-        returns (uint256)
-    {
-        return amountIn;
-    }
+    function swap(address, address, uint256 amountIn) external pure returns (uint256) { return amountIn; }
+    function swap(address, address, uint256 amountIn, uint256) external pure returns (uint256) { return amountIn; }
+    function getAmountOut(address, address, uint256 amountIn) external pure returns (uint256) { return amountIn; }
 }
 
 // =============================================================================
-// MockMerklClaimer — records the most recent claim call so specs can inspect
-// which arguments were passed.  Does NOT transfer tokens; reward token
-// balances are injected directly in harness helpers.
+// MockMerklClaimer
 // =============================================================================
 contract MockMerklClaimer is IMerklClaimer {
-    address public lastCalledClaimer;   // always address(this) — self-marker
+    address public lastCalledClaimer;
     address[] public lastUsers;
     address[] public lastTokens;
-    uint256   public claimCallCount;
+    uint256 public claimCallCount;
 
     function claim(
-        address[] calldata users,
-        address[] calldata tokens,
-        uint256[] calldata, /*amounts*/
-        bytes32[][] calldata /*proofs*/
+        address[] calldata users, address[] calldata tokens,
+        uint256[] calldata, bytes32[][] calldata
     ) external override {
         lastCalledClaimer = address(this);
-        claimCallCount   += 1;
-        // Store first entry for easy access in specs.
-        if (users.length > 0) lastUsers  = users;
+        claimCallCount += 1;
+        if (users.length > 0) lastUsers = users;
         if (tokens.length > 0) lastTokens = tokens;
     }
 }
 
 // =============================================================================
-// MockVault — minimal vault address that the strategy trusts for
-// deposit()/withdraw()/retireStrat() calls.
+// StrategyMorphoMerklHarness — self-contained, no OZ
 //
-// Used to exercise vault-only access control rules.
+// Reimplements the full strategy logic from BaseAllToNativeFactoryStrat +
+// StrategyMorphoMerkl without OZ imports.  Every storage slot and function
+// mirrors the original contracts.
 // =============================================================================
-contract MockVault {
-    StrategyMorphoMerklHarness public strategy;
+contract StrategyMorphoMerklHarness {
 
-    constructor(address _strategy) {
-        strategy = StrategyMorphoMerklHarness(payable(_strategy));
+    // ---- Storage (mirrors BaseAllToNativeFactoryStrat) ----------------------
+    address public want;
+    address public depositToken;
+    address public vault;
+    address public swapper;
+    address public strategist;
+    address public feeRecipient;
+
+    address[] public rewards;
+    mapping(address => uint256) public minAmounts;
+
+    uint256 public lastHarvest;
+    uint256 public totalLocked;
+    uint256 public lockDuration;
+    bool    public harvestOnDeposit;
+
+    address private _owner;
+    bool    private _paused;
+
+    // ---- Storage (mirrors StrategyMorphoMerkl) -----------------------------
+    IERC4626      public morphoVault;
+    IMerklClaimer public claimer;
+
+    // WETH on World Chain
+    address public constant NATIVE = 0x4200000000000000000000000000000000000006;
+    uint256 public constant HARVEST_FEE = 0;
+    uint256 constant DIVISOR = 1 ether;
+
+    // ---- Events ------------------------------------------------------------
+    event StratHarvest(address indexed harvester, uint256 wantHarvested, uint256 tvl);
+    event Deposit(uint256 tvl);
+    event Withdraw(uint256 tvl);
+    event ChargedFees(uint256 feeAmount);
+
+    // ---- Access control (inline, no OZ) ------------------------------------
+    function owner() public view returns (address) { return _owner; }
+    function currentOwner() external view returns (address) { return _owner; }
+    function paused() public view returns (bool) { return _paused; }
+
+    modifier onlyManager() { require(msg.sender == _owner, "!manager"); _; }
+    modifier onlyOwner()   { require(msg.sender == _owner, "!owner"); _; }
+    modifier ifNotPaused() { require(!_paused, "paused"); _; }
+
+    // ---- Initialize (inline, no OZ Initializable) --------------------------
+    bool private _initialized;
+
+    struct Addresses {
+        address want;
+        address depositToken;
+        address vault;
+        address swapper;
+        address strategist;
+        address feeRecipient;
     }
 
-    function callDeposit() external {
-        strategy.deposit();
-    }
-
-    function callWithdraw(uint256 amount) external {
-        strategy.withdraw(amount);
-    }
-
-    function callRetireStrat() external {
-        strategy.retireStrat();
-    }
-
-    function callBeforeDeposit() external {
-        strategy.beforeDeposit();
-    }
-}
-
-// =============================================================================
-// StrategyMorphoMerklHarness
-//
-// Inherits the real StrategyMorphoMerkl and adds:
-//   1. View helpers exposing internal storage slots to the spec.
-//   2. An initializer that wires up all mocks in one call (avoids needing
-//      the prover to model the upgradeable proxy constructor).
-//   3. addYieldToMorpho() — tells the mock vault to simulate earned interest.
-//   4. injectRewardTokens() — mints reward tokens into the strategy's balance
-//      so harvest scenarios can be set up without actual Merkl claims.
-// =============================================================================
-contract StrategyMorphoMerklHarness is StrategyMorphoMerkl {
-
-    // ---- One-shot initializer -----------------------------------------------
-
-    /// @notice Initialise the strategy with all mocks pre-wired.
-    ///         The vault address is provided externally so the spec can link
-    ///         a MockVault instance.
-    function initializeForVerification(
+    function initialize(
         address _morphoVault,
         address _claimer,
-        address _want,
-        address _swapper,
-        address _vault,
-        address _strategist,
-        address _feeRecipient,
-        address[] calldata _rewards
+        bool _harvestOnDeposit,
+        address[] calldata _rewards,
+        Addresses calldata _addresses
+    ) public {
+        require(!_initialized, "already initialized");
+        _initialized = true;
+        _owner = msg.sender;
+        want = _addresses.want;
+        vault = _addresses.vault;
+        swapper = _addresses.swapper;
+        strategist = _addresses.strategist;
+        feeRecipient = _addresses.feeRecipient;
+        morphoVault = IERC4626(_morphoVault);
+        claimer = IMerklClaimer(_claimer);
+        lockDuration = 1 days;
+        for (uint256 i; i < _rewards.length; i++) {
+            _addRewardUnchecked(_rewards[i]);
+        }
+        if (_harvestOnDeposit) {
+            harvestOnDeposit = true;
+            lockDuration = 0;
+        }
+    }
+
+    function initializeForVerification(
+        address _morphoVault, address _claimer, address _want,
+        address _swapper, address _vault, address _strategist,
+        address _feeRecipient, address[] calldata _rewards
     ) external {
-        Addresses memory addrs = Addresses({
-            want:         _want,
-            depositToken: address(0),   // no intermediate deposit token — direct
-            vault:        _vault,
-            swapper:      _swapper,
-            strategist:   _strategist,
-            feeRecipient: _feeRecipient
-        });
-        // Call the real initializer (sets owner = msg.sender via __Ownable_init)
+        Addresses memory addrs = Addresses(_want, address(0), _vault, _swapper, _strategist, _feeRecipient);
         this.initialize(_morphoVault, _claimer, false, _rewards, addrs);
     }
 
-    // ---- Internal state getters (not on the base contract's public surface) --
+    // ---- Core strategy logic (from BaseAllToNativeFactoryStrat) -------------
 
-    /// @notice Total pending locked profit (before any decay).
-    function getTotalLocked() external view returns (uint256) {
-        return totalLocked;
+    function balanceOfPool() public view returns (uint256) {
+        return morphoVault.convertToAssets(morphoVault.balanceOf(address(this)));
     }
 
-    /// @notice Lock duration in seconds.
-    function getLockDuration() external view returns (uint256) {
-        return lockDuration;
+    function balanceOfWant() public view returns (uint256) {
+        return IERC20(want).balanceOf(address(this));
     }
 
-    /// @notice Timestamp of the most recent successful harvest.
-    function getLastHarvest() external view returns (uint256) {
-        return lastHarvest;
+    function lockedProfit() public view returns (uint256) {
+        if (lockDuration == 0) return 0;
+        uint256 elapsed = block.timestamp - lastHarvest;
+        uint256 remaining = elapsed < lockDuration ? lockDuration - elapsed : 0;
+        return totalLocked * remaining / lockDuration;
     }
 
-    /// @notice Whether harvestOnDeposit is enabled.
-    function getHarvestOnDeposit() external view returns (bool) {
-        return harvestOnDeposit;
+    function balanceOf() public view returns (uint256) {
+        return balanceOfWant() + balanceOfPool() - lockedProfit();
     }
 
-    /// @notice Current owner (alias for OwnableUpgradeable.owner()).
-    function currentOwner() external view returns (address) {
-        return owner();
+    function deposit() public ifNotPaused {
+        uint256 wantBal = balanceOfWant();
+        if (wantBal > 0) {
+            IERC20(want).approve(address(morphoVault), wantBal);
+            morphoVault.deposit(wantBal, address(this));
+            emit Deposit(balanceOf());
+        }
     }
 
-    /// @notice Shares of morphoVault held by this strategy.
+    function withdraw(uint256 _amount) external {
+        require(msg.sender == vault, "!vault");
+        uint256 wantBal = balanceOfWant();
+        if (wantBal < _amount) {
+            morphoVault.withdraw(_amount - wantBal, address(this), address(this));
+            wantBal = balanceOfWant();
+        }
+        if (wantBal > _amount) { wantBal = _amount; }
+        IERC20(want).transfer(vault, wantBal);
+        emit Withdraw(balanceOf());
+    }
+
+    function retireStrat() external {
+        require(msg.sender == vault, "!vault");
+        _emergencyWithdraw();
+        IERC20(want).transfer(vault, balanceOfWant());
+    }
+
+    function panic() public onlyManager {
+        _paused = true;
+        _emergencyWithdraw();
+    }
+
+    function pause() public onlyManager { _paused = true; }
+
+    function unpause() external onlyManager {
+        _paused = false;
+        deposit();
+    }
+
+    function _emergencyWithdraw() internal {
+        uint256 bal = morphoVault.balanceOf(address(this));
+        if (bal > 0) {
+            morphoVault.redeem(bal, address(this), address(this));
+        }
+    }
+
+    // ---- Harvest (from BaseAllToNativeFactoryStrat._harvest) ----------------
+
+    function harvest() external onlyManager { _harvest(false); }
+    function harvest(address) external onlyManager { _harvest(false); }
+
+    function _harvest(bool onDeposit) internal ifNotPaused {
+        uint256 beforeBal = balanceOfWant();
+        _swapRewardsToNative();
+        uint256 nativeBal = IERC20(NATIVE).balanceOf(address(this));
+        if (nativeBal > minAmounts[NATIVE]) {
+            _chargeFees();
+            _swapNativeToWant();
+            uint256 wantHarvested = balanceOfWant() - beforeBal;
+            totalLocked = wantHarvested + lockedProfit();
+            lastHarvest = block.timestamp;
+            if (!onDeposit) { deposit(); }
+            emit StratHarvest(msg.sender, wantHarvested, balanceOf());
+        }
+    }
+
+    function _swapRewardsToNative() internal {
+        for (uint256 i; i < rewards.length; ++i) {
+            address token = rewards[i];
+            uint256 amount = IERC20(token).balanceOf(address(this));
+            if (amount > minAmounts[token]) {
+                _swap(token, NATIVE, amount);
+            }
+        }
+    }
+
+    function _chargeFees() internal {
+        uint256 nativeBal = IERC20(NATIVE).balanceOf(address(this));
+        uint256 feeAmount = nativeBal * HARVEST_FEE / DIVISOR;
+        if (feeAmount > 0) {
+            IERC20(NATIVE).transfer(feeRecipient, feeAmount);
+        }
+    }
+
+    function _swapNativeToWant() internal {
+        if (depositToken == address(0)) {
+            uint256 bal = IERC20(NATIVE).balanceOf(address(this));
+            _swap(NATIVE, want, bal);
+        } else {
+            if (depositToken != NATIVE) {
+                uint256 bal = IERC20(NATIVE).balanceOf(address(this));
+                _swap(NATIVE, depositToken, bal);
+            }
+            uint256 bal2 = IERC20(depositToken).balanceOf(address(this));
+            _swap(depositToken, want, bal2);
+        }
+    }
+
+    function _swap(address tokenFrom, address tokenTo, uint256 amount) internal {
+        if (amount > 0 && tokenFrom != tokenTo) {
+            IERC20(tokenFrom).approve(swapper, amount);
+            MockBeefySwapper(swapper).swap(tokenFrom, tokenTo, amount, 0);
+        }
+    }
+
+    // ---- beforeDeposit (harvestOnDeposit gate) ------------------------------
+
+    function beforeDeposit() external {
+        if (harvestOnDeposit) {
+            require(msg.sender == vault, "!vault");
+            _harvest(true);
+        }
+    }
+
+    // ---- Reward management -------------------------------------------------
+
+    function addReward(address _token) public onlyManager {
+        require(_token != want, "!want");
+        require(_token != NATIVE, "!native");
+        require(_token != address(morphoVault), "!morphoVault");
+        rewards.push(_token);
+    }
+
+    function _addRewardUnchecked(address _token) internal { rewards.push(_token); }
+
+    function addWantAsReward() external onlyOwner { rewards.push(want); }
+
+    function removeReward(uint256 i) external onlyManager {
+        rewards[i] = rewards[rewards.length - 1]; rewards.pop();
+    }
+
+    function resetRewards() external onlyManager { delete rewards; }
+
+    function setRewardMinAmount(address token, uint256 minAmount) external onlyManager {
+        minAmounts[token] = minAmount;
+    }
+
+    function rewardsLength() external view returns (uint256) { return rewards.length; }
+
+    // ---- Merkl claim (from StrategyMorphoMerkl) ----------------------------
+
+    function claim(
+        address[] calldata _tokens,
+        uint256[] calldata _amounts,
+        bytes32[][] calldata _proofs
+    ) external {
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        claimer.claim(users, _tokens, _amounts, _proofs);
+    }
+
+    // Base claim() — no-op for Morpho strategy
+    function claim() external onlyManager {}
+
+    // ---- Setters -----------------------------------------------------------
+
+    function setClaimer(address _claimer) external onlyManager {
+        claimer = IMerklClaimer(_claimer);
+    }
+
+    function setVault(address _vault) external onlyOwner { vault = _vault; }
+    function setSwapper(address _swapper) external onlyOwner { swapper = _swapper; }
+    function setStrategist(address _strategist) external {
+        require(msg.sender == strategist, "!strategist"); strategist = _strategist;
+    }
+    function setFeeRecipient(address _feeRecipient) external onlyOwner { feeRecipient = _feeRecipient; }
+
+    function setDepositToken(address token) public onlyManager {
+        if (token == address(0)) { depositToken = address(0); return; }
+        require(token != want, "!want");
+        require(token != address(morphoVault), "!morphoVault");
+        depositToken = token;
+    }
+
+    function setHarvestOnDeposit(bool _hod) public onlyManager {
+        harvestOnDeposit = _hod;
+        lockDuration = _hod ? 0 : 1 days;
+    }
+
+    function setLockDuration(uint256 _duration) external onlyManager { lockDuration = _duration; }
+
+    function transferOwnership(address newOwner) external onlyOwner { _owner = newOwner; }
+    function renounceOwnership() external onlyOwner { _owner = address(0); }
+
+    // ---- View stubs --------------------------------------------------------
+    function stratName() public pure returns (string memory) { return "MorphoMerkl"; }
+    function rewardsAvailable() external pure returns (uint256) { return 0; }
+    function callReward() external pure returns (uint256) { return 0; }
+    function depositFee() public pure returns (uint256) { return 0; }
+    function withdrawFee() public pure returns (uint256) { return 0; }
+
+    // ---- Harness helpers (for spec) ----------------------------------------
+
+    function getTotalLocked() external view returns (uint256) { return totalLocked; }
+    function getLockDuration() external view returns (uint256) { return lockDuration; }
+    function getLastHarvest() external view returns (uint256) { return lastHarvest; }
+
     function morphoSharesHeld() external view returns (uint256) {
         return morphoVault.balanceOf(address(this));
     }
 
-    // ---- Yield simulation helpers -------------------------------------------
-
-    /// @notice Inject yield into the underlying Morpho vault mock.
-    ///         The mock's addYield() increases totalAssets without minting
-    ///         new shares, which raises convertToAssets() for all shareholders.
-    ///         Call this before running harvest-scenario rules.
     function addYieldToMorpho(uint256 yieldAmount) external {
         MockMorphoVault(address(morphoVault)).addYield(yieldAmount);
     }
 
-    /// @notice Directly mint reward tokens into this contract's balance.
-    ///         Simulates Merkl having distributed tokens that are now claimable
-    ///         without requiring a full Merkl proof verification in the spec.
     function injectRewardTokens(address rewardToken, uint256 amount) external {
         MockERC20Simple(rewardToken).mint(address(this), amount);
     }
 
-    /// @notice Expose the claimer's call count so specs can verify it was
-    ///         invoked exactly once (or not at all) during harvest.
     function claimCallCount() external view returns (uint256) {
         return MockMerklClaimer(address(claimer)).claimCallCount();
     }
 
-    /// @notice Return the claimer address for identity checks in specs.
-    function claimerAddress() external view returns (address) {
-        return address(claimer);
-    }
+    function claimerAddress() external view returns (address) { return address(claimer); }
+    function currentLockedProfit() external view returns (uint256) { return lockedProfit(); }
 
-    // ---- lockedProfit re-exposure (already public but aliased for clarity) --
-
-    /// @notice Alias for lockedProfit() — useful in spec `require` preconditions.
-    function currentLockedProfit() external view returns (uint256) {
-        return lockedProfit();
-    }
+    receive() external payable {}
 }

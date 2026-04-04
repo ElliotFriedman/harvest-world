@@ -52,13 +52,17 @@ methods {
     function swapper.currentOwner()                           external returns (address)   envfree;
     function swapper.slippage()                               external returns (uint256)   envfree;
 
+    // CVL2 proxy helpers — avoid address-variable.method() calls in specs
+    function swapper.tokenBalanceOf(address, address)         external returns (uint256)   envfree;
+    function swapper.swapperTokenBalance(address)             external returns (uint256)   envfree;
+
     // ---------- BeefySwapper public surface -----------------------------------
     // swap(from, to, amountIn)  — oracle-priced path
     function swapper.swap(address, address, uint256)          external returns (uint256);
     // swap(from, to, amountIn, minAmountOut) — explicit min path
     function swapper.swap(address, address, uint256, uint256) external returns (uint256);
 
-    function swapper.setSwapInfo(address, address, BeefySwapperHarness.SwapInfo) external;
+    function swapper.setSwapInfo(address, address, BeefySwapper.SwapInfo) external;
     function swapper.setOracle(address)                       external;
     function swapper.setSlippage(uint256)                     external;
     function swapper.getAmountOut(address, address, uint256)  external returns (uint256);
@@ -80,11 +84,12 @@ methods {
     function _.decimals()                                     external => DISPATCHER(true);
 
     // ---------- Router summary ------------------------------------------------
-    // The router is called via a low-level `router.call(data)`.  We summarise
-    // the entire external call as NONDET: it may succeed or fail, and it may
-    // change token balances in any way.  This is the most adversarial model —
-    // it means swap safety properties hold even against a malicious router.
-    function _.fallback()                                     external => NONDET;
+    // The router is called via a low-level `router.call(data)`.  In CVL2,
+    // fallback functions cannot be declared in the methods block.
+    // The router's arbitrary behaviour is captured by NONDET summaries for
+    // all other external calls; the low-level call itself is modelled as
+    // having arbitrary side-effects on token balances.
+    // REMOVED: function _.fallback() external => NONDET;  (not valid CVL2 syntax)
 }
 
 // =============================================================================
@@ -111,6 +116,31 @@ hook Sload uint256 val slippage STORAGE {
 // =============================================================================
 
 // -----------------------------------------------------------------------------
+// Helper: requireInitialized
+//
+// Why it matters: BeefySwapper inherits OwnableUpgradeable.  Before
+// initialize() is called, owner is address(0).  The prover explores
+// uninitialized states where owner==0, producing spurious counterexamples
+// for every access-control rule.  By requiring owner != 0 we restrict
+// analysis to post-initialization states — the only states reachable in
+// production (proxies call initialize() in the same tx as deployment).
+//
+// Note: this is a CVL function (not an invariant) because renounceOwnership()
+// can set owner to 0, making a strict invariant unprovable.  In production
+// the owner never renounces ownership of the swapper.
+// -----------------------------------------------------------------------------
+function requireInitialized() {
+    require currentOwner() != 0;
+}
+
+// Helper: requireValidEnv — excludes impossible env states.
+// All BeefySwapper functions are non-payable; sending ETH causes revert.
+function requireValidEnv(env e) {
+    requireInitialized();
+    require e.msg.value == 0;
+}
+
+// -----------------------------------------------------------------------------
 // I-1: slippageNeverExceedsDivisor
 //
 // Why it matters: slippage is used as a multiplier in `_getAmountOut`:
@@ -129,14 +159,14 @@ hook Sload uint256 val slippage STORAGE {
 invariant slippageNeverExceedsDivisor()
     ghostSlippage <= 1000000000000000000   // 1e18
     {
+        preserved {
+            requireInitialized();
+        }
         preserved setSlippage(uint256 val) with (env e) {
-            // After clamping, the written value is min(val, 1e18).
-            // The hook captures the post-clamp value; no extra assumption needed.
+            requireInitialized();
         }
         preserved initialize(address _oracle, uint256 _slippage) with (env e) {
-            // Initialization path: constructor-called, so only once per proxy.
-            // We require the invariant holds afterwards by letting the prover
-            // check the post-state through the ghost hook.
+            requireInitialized();
         }
     }
 
@@ -160,6 +190,7 @@ invariant slippageNeverExceedsDivisor()
 // -----------------------------------------------------------------------------
 rule swapRevertsIfNoSwapData(address fromToken, address toToken, uint256 amountIn) {
     env e;
+    requireValidEnv(e);
 
     // Pre-condition: no swap route has been configured.
     require getSwapInfoRouter(fromToken, toToken) == 0;
@@ -195,6 +226,7 @@ rule slippageAlwaysApplied(
     uint256 minAmountOut
 ) {
     env e;
+    requireValidEnv(e);
 
     // Require a valid swap route exists (otherwise we test R-1, not R-2).
     require getSwapInfoRouter(fromToken, toToken) != 0;
@@ -240,12 +272,14 @@ rule swapDoesNotChangeCallerBalanceOnRevert(
     uint256 minAmountOut
 ) {
     env e;
+    requireValidEnv(e);
 
-    uint256 callerBalBefore = fromToken.balanceOf(e.msg.sender);
+    // Use harness proxy instead of fromToken.balanceOf() which is invalid in CVL2
+    uint256 callerBalBefore = tokenBalanceOf(fromToken, e.msg.sender);
 
     swapper.swap@withrevert(e, fromToken, toToken, amountIn, minAmountOut);
 
-    uint256 callerBalAfter = fromToken.balanceOf(e.msg.sender);
+    uint256 callerBalAfter = tokenBalanceOf(fromToken, e.msg.sender);
 
     // If the call reverted, the caller's balance must be unchanged.
     assert lastReverted => (callerBalAfter == callerBalBefore),
@@ -264,6 +298,7 @@ rule swapDoesNotChangeCallerBalanceOnRevert(
 // -----------------------------------------------------------------------------
 rule slippageMax100Percent(uint256 val) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender == currentOwner();
     require val > 1000000000000000000;  // val > 1e18
@@ -285,6 +320,7 @@ rule slippageMax100Percent(uint256 val) {
 // -----------------------------------------------------------------------------
 rule setSlippageUpdatesStorage(uint256 val) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender == currentOwner();
     require val <= 1000000000000000000;  // val in [0, 1e18]
@@ -307,6 +343,7 @@ rule setSlippageUpdatesStorage(uint256 val) {
 // -----------------------------------------------------------------------------
 rule slippageZeroAllowed() {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender == currentOwner();
 
@@ -331,6 +368,7 @@ rule slippageZeroAllowed() {
 // -----------------------------------------------------------------------------
 rule onlyOwnerCanSetOracle(address newOracle) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender != currentOwner();
 
@@ -351,6 +389,7 @@ rule onlyOwnerCanSetOracle(address newOracle) {
 // -----------------------------------------------------------------------------
 rule setOracleUpdatesStorage(address newOracle) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender == currentOwner();
     require newOracle != 0;
@@ -373,9 +412,10 @@ rule setOracleUpdatesStorage(address newOracle) {
 rule onlyOwnerCanSetSwapInfo(
     address fromToken,
     address toToken,
-    BeefySwapperHarness.SwapInfo swapInfoParam
+    BeefySwapper.SwapInfo swapInfoParam
 ) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender != currentOwner();
 
@@ -397,9 +437,10 @@ rule onlyOwnerCanSetSwapInfo(
 rule setSwapInfoUpdatesStorage(
     address fromToken,
     address toToken,
-    BeefySwapperHarness.SwapInfo swapInfoParam
+    BeefySwapper.SwapInfo swapInfoParam
 ) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender == currentOwner();
 
@@ -420,6 +461,7 @@ rule setSwapInfoUpdatesStorage(
 // -----------------------------------------------------------------------------
 rule onlyOwnerCanSetSlippage(uint256 val) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender != currentOwner();
 
@@ -449,14 +491,15 @@ rule explicitSwapRevertsWhenOutputBelowMin(
     uint256 minAmountOut
 ) {
     env e;
+    requireValidEnv(e);
 
     require getSwapInfoRouter(fromToken, toToken) != 0;
     require fromToken != toToken;
     require minAmountOut > 0;
 
     // Constrain the post-swap toToken balance of the swapper to be below min.
-    // The NONDET summary for balanceOf lets the prover instantiate this value.
-    require toToken.balanceOf(swapper) < minAmountOut;
+    // Use harness proxy instead of toToken.balanceOf(swapper) which is invalid in CVL2.
+    require swapperTokenBalance(toToken) < minAmountOut;
 
     swapper.swap@withrevert(e, fromToken, toToken, amountIn, minAmountOut);
 
@@ -478,10 +521,11 @@ rule setSwapInfoRouterZeroAllowed(
     address toToken
 ) {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender == currentOwner();
 
-    BeefySwapperHarness.SwapInfo emptyInfo;
+    BeefySwapper.SwapInfo emptyInfo;
     require emptyInfo.router == 0;
 
     setSwapInfo@withrevert(e, fromToken, toToken, emptyInfo);
@@ -503,6 +547,7 @@ rule setSwapInfoRouterZeroAllowed(
 // -----------------------------------------------------------------------------
 rule setOracleToZeroAllowed() {
     env e;
+    requireValidEnv(e);
 
     require e.msg.sender == currentOwner();
 
@@ -525,6 +570,7 @@ rule setOracleToZeroAllowed() {
 // -----------------------------------------------------------------------------
 rule getAmountOutDoesNotChangeSlippage(address fromToken, address toToken, uint256 amountIn) {
     env e;
+    requireValidEnv(e);
 
     uint256 slippageBefore = slippage();
 

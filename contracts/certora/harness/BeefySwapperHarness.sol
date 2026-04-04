@@ -251,4 +251,18 @@ contract BeefySwapperHarness is BeefySwapper {
     function injectRouterOutput(address toToken, uint256 amount) external {
         MockERC20Swappable(toToken).mint(address(this), amount);
     }
+
+    // ---- CVL2 proxy helpers --------------------------------------------------
+    // CVL2 cannot dispatch method calls on address-typed rule parameters.
+    // These flat helpers let specs check token balances without chaining.
+
+    /// @notice Balance of `user` in token `token` — avoids token.balanceOf() in CVL2.
+    function tokenBalanceOf(address token, address user) external view returns (uint256) {
+        return MockERC20Swappable(token).balanceOf(user);
+    }
+
+    /// @notice Balance of this swapper contract in token `token`.
+    function swapperTokenBalance(address token) external view returns (uint256) {
+        return MockERC20Swappable(token).balanceOf(address(this));
+    }
 }

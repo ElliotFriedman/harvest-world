@@ -57,7 +57,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * It takes into account the vault contract balance, the strategy contract balance
      *  and the balance deployed in other contracts as part of the strategy.
      */
-    function balance() public view returns (uint256) {
+    function balance() public view virtual returns (uint256) {
         return want().balanceOf(address(this)) + IStrategyV7(strategy).balanceOf();
     }
 
@@ -67,7 +67,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * want to keep some of the system funds at hand in the vault, instead
      * of putting them to work.
      */
-    function available() public view returns (uint256) {
+    function available() public view virtual returns (uint256) {
         return want().balanceOf(address(this));
     }
 
@@ -92,7 +92,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * Pulls tokens via Permit2 allowance-based transferFrom.
      * User must have approved this vault as a Permit2 spender beforehand.
      */
-    function deposit(uint256 _amount) public nonReentrant {
+    function deposit(uint256 _amount) public virtual nonReentrant {
         strategy.beforeDeposit();
 
         uint256 _pool = balance();
@@ -109,7 +109,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * @dev Function to send funds into the strategy and put them to work. It's primarily called
      * by the vault's deposit() function.
      */
-    function earn() public {
+    function earn() public virtual {
         uint256 _bal = available();
         want().safeTransfer(address(strategy), _bal);
         strategy.deposit();
@@ -127,7 +127,7 @@ contract BeefyVaultV7 is ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUp
      * from the strategy and pay up the token holder. A proportional number of IOU
      * tokens are burned in the process.
      */
-    function withdraw(uint256 _shares) public {
+    function withdraw(uint256 _shares) public virtual {
         uint256 r = (balance() * _shares) / totalSupply();
         _burn(msg.sender, _shares);
 
