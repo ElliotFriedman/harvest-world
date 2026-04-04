@@ -40,6 +40,7 @@ export interface AgentStatus {
   pendingRewards: { token: string; amount: string; usdValue: number } | null;
   nextCheck: string;
   balanceOfPool?: string;
+  uniswapQuote?: { expectedOutput: string; gasFeeUSD: string; priceImpact: string; routing: string } | null;
   streaming?: { lockedUsd: string; unlocksInMs: number } | null;
 }
 
@@ -53,6 +54,7 @@ export interface HarvestResult {
   oldSharePrice?: string;
   reason?: string;
   message?: string;
+  uniswapQuote?: { expectedOutput: string; gasFeeUSD: string; priceImpact: string; routing: string } | null;
 }
 
 export async function getAgentStatus(): Promise<AgentStatus> {

@@ -19,6 +19,7 @@ import {
   vaultAbi,
 } from "./config.js";
 import { fetchMerklRewards, formatTokenAmount } from "./merkl.js";
+import { fetchUniswapQuote, type UniswapQuote } from "./uniswap.js";
 
 // ─── Result type ─────────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ export interface HarvestResult {
   rewardsClaimed?: string;
   oldSharePrice?: string;
   newSharePrice?: string;
+  uniswapQuote?: UniswapQuote | null;
 }
 
 // ─── Main harvest function ───────────────────────────────────────────────────
@@ -65,6 +67,31 @@ export async function runHarvest(agentPrivateKey: Hex): Promise<HarvestResult> {
   console.log(`  Found ${rewards.length} reward token(s) with unclaimed balances:`);
   for (const r of rewards) {
     console.log(`    - ${formatTokenAmount(r.unclaimed)} ${r.symbol} (${r.token})`);
+  }
+
+  // ── Step 1.5: Uniswap quote — estimate swap output ────────────────────
+
+  const wldRewards = rewards.filter(
+    (r) => r.token.toLowerCase() === "0x2cFc85d8E48F8EAB294be644d9E25C3030863003".toLowerCase()
+  );
+  const totalWld = wldRewards.reduce((sum, r) => sum + r.unclaimed, 0n);
+  console.log(`\n[Uniswap] Fetching swap quote for ${formatTokenAmount(totalWld)} WLD → USDC...`);
+  const uniswapQuote = await fetchUniswapQuote(totalWld);
+
+  if (uniswapQuote) {
+    console.log(`  Expected output: ${uniswapQuote.expectedOutput}`);
+    console.log(`  Gas fee: $${uniswapQuote.gasFeeUSD} | Price impact: ${uniswapQuote.priceImpact}%`);
+    console.log(`  Routing: ${uniswapQuote.routing}`);
+
+    // Profitability gate: skip if gas exceeds 50% of expected output
+    const outputUSD = parseFloat(uniswapQuote.expectedOutput);
+    const gasUSD = parseFloat(uniswapQuote.gasFeeUSD);
+    if (outputUSD > 0 && gasUSD > outputUSD * 0.5) {
+      console.warn(`  Gas ($${gasUSD.toFixed(2)}) exceeds 50% of output ($${outputUSD.toFixed(2)}). Skipping harvest.`);
+      return { success: false, reason: "gas_too_high", uniswapQuote };
+    }
+  } else {
+    console.log("  Quote unavailable — proceeding with harvest anyway.");
   }
 
   // ── Step 2: Read share price before harvest ──────────────────────────────
@@ -109,7 +136,7 @@ export async function runHarvest(agentPrivateKey: Hex): Promise<HarvestResult> {
 
   if (claimReceipt.status === "reverted") {
     console.error("  Claim transaction reverted!");
-    return { success: false, reason: "claim_reverted", claimTxHash: claimHash };
+    return { success: false, reason: "claim_reverted", claimTxHash: claimHash, uniswapQuote };
   }
 
   // ── Step 4: Harvest — swap rewards to USDC and redeposit into Morpho ────
@@ -139,6 +166,7 @@ export async function runHarvest(agentPrivateKey: Hex): Promise<HarvestResult> {
       claimTxHash: claimHash,
       harvestTxHash: harvestHash,
       rewardsClaimed: rewardsSummary,
+      uniswapQuote,
     };
   }
 
@@ -169,5 +197,6 @@ export async function runHarvest(agentPrivateKey: Hex): Promise<HarvestResult> {
     rewardsClaimed: rewardsSummary,
     oldSharePrice: formatUnits(priceBefore, 6),
     newSharePrice: formatUnits(priceAfter, 6),
+    uniswapQuote,
   };
 }

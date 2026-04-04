@@ -9,6 +9,7 @@ import {
   fetchWldPrice,
   formatWldAmount,
 } from "../../../../lib/harvester";
+import { fetchUniswapQuote } from "../../../../lib/uniswap";
 
 // Server-only — RPC_URL never exposed to browser
 const RPC_URL = process.env.RPC_URL || "https://worldchain.drpc.org";
@@ -34,6 +35,13 @@ export async function GET() {
       fetchMerklRewards(STRATEGY_ADDRESS),
       fetchWldPrice(),
     ]);
+
+    // Uniswap quote for pending rewards
+    const wldRewards = merklRewards.filter(
+      (r) => r.token.toLowerCase() === WLD_ADDRESS.toLowerCase()
+    );
+    const totalPendingWld = wldRewards.reduce((sum: bigint, r: any) => sum + r.unclaimed, BigInt(0));
+    const uniswapQuote = totalPendingWld > BigInt(0) ? await fetchUniswapQuote(totalPendingWld) : null;
 
     // Parse pending rewards (look for WLD specifically, or take first)
     let pendingRewards: {
@@ -91,6 +99,7 @@ export async function GET() {
       pendingRewards,
       nextCheck,
       balanceOfPool: balanceOfPool.toString(),
+      uniswapQuote,
       streaming,
     });
   } catch (err) {
@@ -106,6 +115,7 @@ export async function GET() {
       pendingRewards: null,
       nextCheck: new Date(Date.now() + 6 * 3600_000).toISOString(),
       balanceOfPool: "0",
+      uniswapQuote: null,
       streaming: null,
     });
   }

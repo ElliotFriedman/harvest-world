@@ -53,6 +53,7 @@ This is what "DeFi, for humans" actually means at scale.
 | BeefyVaultV7 + StrategyMorpho on World Chain mainnet | Deployed |
 | World ID deposit gate (Orb-verified humans only) | Implemented |
 | AgentKit harvester — claims Merkl, swaps WLD→USDC, redeposits | Implemented |
+| Uniswap Trading API — pre-harvest swap quotes + profitability gating | Implemented |
 | Next.js 15 World Mini App with MiniKit 2.0 | Deployed |
 | Permit2 atomic approve+deposit | Implemented |
 | Terminal UI with progressive disclosure | Implemented |
@@ -95,14 +96,15 @@ docs/         Product spec, technical design, pitch, infra
 | Best Use of AgentKit | $8,000 | Agent IS the strategist — claims, swaps, redeposits autonomously using AgentKit + x402 |
 | Best Use of World ID | $8,000 | World ID gates deposits. Only Orb-verified humans. Sybil-proof vault. |
 | Best Use of MiniKit | $4,000 | Permit2 atomic approve+deposit, walletAuth, IDKit verify — deep MiniKit integration |
+| Best Uniswap API Integration | $10,000 | Agent uses Uniswap Trading API for swap intelligence — quotes WLD→USDC before harvest, gates on profitability |
 
 ## Demo
 
-Open Harvest in World App → verify human (World ID orb) → `vaults` → `deposit 50 usdc` → `portfolio` → `agent status` → `agent harvest`
+Open Harvest in World App → verify human (World ID orb) → `vaults` → `deposit 50 usdc` → `portfolio` → `agent status` (shows Uniswap swap estimate) → `agent harvest` (quotes WLD→USDC via Uniswap API before executing)
 
 ## Contracts
 
-Forked from [beefyfinance/beefy-contracts](https://github.com/beefyfinance/beefy-contracts) (MIT licensed, battle-tested, $billions TVL). Modifications: World ID deposit gate, Permit2 transfer path, Uniswap V3 swap routing for World Chain.
+Forked from [beefyfinance/beefy-contracts](https://github.com/beefyfinance/beefy-contracts) (MIT licensed, battle-tested, $billions TVL). Modifications: World ID deposit gate, Permit2 transfer path, Uniswap V3 swap routing for World Chain. The agent uses the [Uniswap Trading API](https://hub.uniswap.org) for swap intelligence — quoting WLD→USDC before each harvest to verify profitability.
 
 ## Docs
 
@@ -116,3 +118,4 @@ Forked from [beefyfinance/beefy-contracts](https://github.com/beefyfinance/beefy
 | [Cloud Architecture](docs/cloud-architecture.md) | Hosting, deployment, agent runtime, infra decisions |
 | [AgentBook Integration](docs/agentbook-integration.md) | How the vault verifies human-backed agents via AgentKit |
 | [Infra Checklist](docs/infra-checklist.md) | Setup tasks — Developer Portal, wallets, Vercel, Supabase |
+| [Security Audit](docs/security-audit.md) | On-chain state verification, API surface, deployment hygiene |

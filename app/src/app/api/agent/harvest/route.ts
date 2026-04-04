@@ -9,12 +9,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import {
   STRATEGY_ADDRESS,
   VAULT_ADDRESS,
+  WLD_ADDRESS,
   strategyAbi,
   vaultAbi,
   harvestStore,
   fetchMerklRewards,
   formatWldAmount,
 } from "../../../../lib/harvester";
+import { fetchUniswapQuote } from "../../../../lib/uniswap";
 
 // Server-only — RPC_URL never exposed to browser
 const RPC_URL = process.env.RPC_URL || "https://worldchain.drpc.org";
@@ -70,6 +72,13 @@ async function harvest() {
         message: "No unclaimed Merkl rewards for the strategy.",
       });
     }
+
+    // Uniswap quote — estimate swap output
+    const wldRewards = rewards.filter(
+      (r) => r.token.toLowerCase() === WLD_ADDRESS.toLowerCase()
+    );
+    const totalWld = wldRewards.reduce((sum: bigint, r: any) => sum + r.unclaimed, BigInt(0));
+    const uniswapQuote = await fetchUniswapQuote(totalWld);
 
     // 3. Build claim parameters from rewards
     const tokens = rewards.map((r) => r.token as `0x${string}`);
@@ -133,8 +142,9 @@ async function harvest() {
     const record = {
       timestamp: new Date().toISOString(),
       txHash: harvestHash,
-      wantEarned: "-- USDC", // exact amount requires event parsing
+      wantEarned: uniswapQuote?.expectedOutput ?? "-- USDC",
       rewardsClaimed: rewardsSummary,
+      uniswapQuote,
     };
     harvestStore.push(record);
 
@@ -146,6 +156,7 @@ async function harvest() {
       wantEarned: record.wantEarned,
       newSharePrice: priceAfter.toString(),
       oldSharePrice: priceBefore.toString(),
+      uniswapQuote,
     });
   } catch (err) {
     console.error("Harvest error:", err);
