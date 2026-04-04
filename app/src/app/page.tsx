@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type { IDKitResult, IDKitErrorCodes, RpContext } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData } from "viem";
-import { getBalances, getVaultTvl } from "../lib/client";
+import { getBalances, getVaultTvl, getAgentStatus, triggerHarvest } from "../lib/client";
 
 // Lazy-load IDKit to prevent crashes in World App webview
 const LazyIDKit = dynamic(
@@ -108,6 +108,18 @@ export default function Terminal() {
   const print = useCallback((...newLines: string[]) => {
     setLines((prev) => [...prev, ...newLines]);
   }, []);
+
+  async function typewriterPrint(text: string, delayMs = 28): Promise<void> {
+    setLines((prev) => [...prev, ""]);
+    for (let i = 1; i <= text.length; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      setLines((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = text.slice(0, i);
+        return updated;
+      });
+    }
+  }
 
   // ── Command handlers ────────────────────────────────────────────────────────
 
@@ -312,6 +324,23 @@ export default function Terminal() {
   async function handleAgentHarvest() {
     print("Triggering manual harvest...");
     print("No pending rewards above threshold.", "");
+  }
+
+  // ── Easter egg ──────────────────────────────────────────────────────────────
+
+  async function handleEasterEgg() {
+    await typewriterPrint("* you found the easter egg. congrats. *");
+    await new Promise<void>((r) => setTimeout(r, 500));
+    print("");
+    await typewriterPrint("we wanted to add the wonder back into finance.");
+    await new Promise<void>((r) => setTimeout(r, 200));
+    await typewriterPrint("the feeling of getting a new computer.");
+    await new Promise<void>((r) => setTimeout(r, 200));
+    await typewriterPrint("and entering a whole new world...");
+    await new Promise<void>((r) => setTimeout(r, 600));
+    print("");
+    await typewriterPrint("we hope you enjoy :)");
+    print("");
   }
 
   // ── Deposit picker flow ──────────────────────────────────────────────────────
@@ -564,6 +593,8 @@ export default function Terminal() {
       await handleAgentHarvest();
     } else if (cmd === "clear") {
       setLines([]);
+    } else if (trimmed === "easter egg") {
+      await handleEasterEgg();
     } else {
       print(`Unknown command: '${cmd}'. Type 'help' for options.`, "");
     }
