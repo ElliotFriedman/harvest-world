@@ -133,7 +133,10 @@ This section exists for one reason: to show judges we went all-in.
 | Total commits | **160** |
 | Merged pull requests | **94** |
 | GitHub issues tracked | **90+** |
-| Lines of code (Solidity + TypeScript) | **3,020** |
+| Solidity (28 files) | **2,175 lines** |
+| TypeScript (17 files) | **1,807 lines** |
+| Documentation (14 files) | **11,332 lines** |
+| Full repo (excl. dependencies) | **~19,400 lines** |
 | Build window | **36 hours** (ETHGlobal Cannes, Apr 3–5 2026) |
 
 [View commit frequency →](https://github.com/ElliotFriedman/harvest-world/graphs/commit-activity)
