@@ -268,7 +268,7 @@ export default function Terminal() {
       print(
         `Portfolio for ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
         `  USDC in wallet: $${formatBigintUSDC(usdcBalance)}`,
-        `  Vault shares:   ${formatBigintUSDC(vaultShares)} mooUSDC`,
+        `  Vault shares:   ${formatBigintUSDC(vaultShares)} hvUSDC`,
         `  USD value:      $${formatBigintUSDC(usdValue)}`,
         ""
       );

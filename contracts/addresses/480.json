@@ -75,17 +75,37 @@
         "isContract": true
     },
     {
-        "addr": "0xe770BD40b6976Efbbb095174395DD2cb794c938a",
+        "addr": "0x8e834E4C505A113A76f5851fF2Aaa8Cb2D9EfD76",
+        "name": "PROXY_ADMIN",
+        "isContract": true
+    },
+    {
+        "addr": "0x3bF006f3479C112aDE00F4e5F5A8c0497F99779C",
+        "name": "BEEFY_SWAPPER_IMPL",
+        "isContract": true
+    },
+    {
+        "addr": "0x866b838b97Ee43F2c818B3cb5Cc77A0dc22003Fc",
         "name": "BEEFY_SWAPPER",
         "isContract": true
     },
     {
-        "addr": "0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD",
+        "addr": "0x70dfd93c1BB7A5148B9F9b555C155ea95aeEe99D",
+        "name": "HARVEST_VAULT_IMPL",
+        "isContract": true
+    },
+    {
+        "addr": "0x512CE44e4F69A98bC42A57ceD8257e65e63cD74f",
         "name": "HARVEST_VAULT",
         "isContract": true
     },
     {
-        "addr": "0xd2753e1Ce625A776A4d73f0251419Ba5Dfc1c0A5",
+        "addr": "0xaeC922941F63EF49474Df4a8d6ca2503fB38396f",
+        "name": "HARVEST_STRATEGY_IMPL",
+        "isContract": true
+    },
+    {
+        "addr": "0x313bA1D5D5AA1382a80BA839066A61d33C110489",
         "name": "HARVEST_STRATEGY",
         "isContract": true
     }
