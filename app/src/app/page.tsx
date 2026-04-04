@@ -116,18 +116,23 @@ export default function Terminal() {
   }, [lines]);
 
   useEffect(() => {
-    if (MiniKit.isInstalled()) {
-      if (MiniKit.user?.walletAddress) {
-        setWalletAddress(MiniKit.user.walletAddress);
+    // Delay MiniKit check — the webview needs ~250ms to initialize MiniKit
+    // before isInstalled() reliably returns true inside World App.
+    const timer = setTimeout(() => {
+      if (MiniKit.isInstalled()) {
+        if (MiniKit.user?.walletAddress) {
+          setWalletAddress(MiniKit.user.walletAddress);
+        }
+        setLines([
+          "HARVEST v2.5 — Agentic DeFi, for humans.",
+          "World Chain yield aggregator.",
+          "",
+        ]);
+      } else {
+        runObserverBoot();
       }
-      setLines([
-        "HARVEST v2.4 — Agentic DeFi, for humans.",
-        "World Chain yield aggregator.",
-        "",
-      ]);
-    } else {
-      runObserverBoot();
-    }
+    }, 250);
+    return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -165,35 +170,31 @@ export default function Terminal() {
   }
 
   async function runObserverBoot(): Promise<void> {
+    // Desktop-only boot — type at 55ms (30% slower than the in-app 42ms default)
+    const d = 55;
     await flicker();
-    await typewriterPrint("HARVEST OS v2.4");
+    await typewriterPrint("HARVEST OS v2.5", d);
     await new Promise((r) => setTimeout(r, 300));
-    await typewriterPrint("initializing...");
+    await typewriterPrint("initializing...", d);
     await new Promise((r) => setTimeout(r, 500));
     await flicker();
     setLines((prev) => [...prev, ""]);
-    await typewriterPrint("> checking World App... [not installed]");
+    await typewriterPrint("> checking World App... [not installed]", d);
     await new Promise((r) => setTimeout(r, 300));
-    await typewriterPrint("> falling back to observer mode");
+    await typewriterPrint("> falling back to observer mode", d);
     await new Promise((r) => setTimeout(r, 600));
     setLines((prev) => [...prev, ""]);
-    await typewriterPrint("This terminal runs inside World App.");
+    await typewriterPrint("This terminal runs inside World App.", d);
     await new Promise((r) => setTimeout(r, 200));
-    await typewriterPrint("You're seeing the outside.");
+    await typewriterPrint("You're seeing the outside.", d);
     await new Promise((r) => setTimeout(r, 600));
     await gentleFlicker();
     setLines((prev) => [...prev, ""]);
-    await typewriterPrint("The humans are inside, earning yield.");
+    await typewriterPrint("The humans are inside, earning yield.", d);
     await new Promise((r) => setTimeout(r, 200));
-    await typewriterPrint("Scan to join them.");
-    setLines((prev) => [
-      ...prev,
-      "",
-      "  open in World App:",
-      `  ${WORLD_APP_URL}`,
-      "",
-    ]);
-    await typewriterPrint("Type 'help' to explore. Type 'scan' for the deeplink.");
+    await typewriterPrint("Scan the QR to join them.", d);
+    setLines((prev) => [...prev, ""]);
+    await typewriterPrint("Type 'help' to explore.", d);
     setLines((prev) => [...prev, ""]);
     setIsObserverMode(true);
   }
@@ -1003,8 +1004,26 @@ export default function Terminal() {
                 fgColor="#00ff41"
               />
             </div>
-            <div style={{ fontSize: "9px", color: "#00ff41", opacity: 0.6, textAlign: "center", maxWidth: "160px" }}>
-              harvest.world // DeFi, for humans
+            <button
+              onClick={() => navigator.clipboard.writeText(WORLD_APP_URL)}
+              style={{
+                background: "transparent",
+                border: "1px solid #00ff41",
+                color: "#00ff41",
+                fontFamily: "inherit",
+                fontSize: "11px",
+                padding: "5px 12px",
+                cursor: "pointer",
+                letterSpacing: "0.05em",
+                width: "100%",
+              }}
+              onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = "#00ff41"; (e.target as HTMLButtonElement).style.color = "#000"; }}
+              onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = "transparent"; (e.target as HTMLButtonElement).style.color = "#00ff41"; }}
+            >
+              [ copy link ]
+            </button>
+            <div style={{ fontSize: "9px", color: "#00ff41", opacity: 0.5, textAlign: "center", maxWidth: "160px" }}>
+              harvest // DeFi, for humans
             </div>
           </div>
         </>
