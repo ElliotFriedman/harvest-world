@@ -71,7 +71,10 @@ export async function runHarvest(agentPrivateKey: Hex): Promise<HarvestResult> {
 
   // ── Step 1.5: Uniswap quote — estimate swap output ────────────────────
 
-  const totalWld = rewards.reduce((sum, r) => sum + r.unclaimed, 0n);
+  const wldRewards = rewards.filter(
+    (r) => r.token.toLowerCase() === "0x2cFc85d8E48F8EAB294be644d9E25C3030863003".toLowerCase()
+  );
+  const totalWld = wldRewards.reduce((sum, r) => sum + r.unclaimed, 0n);
   console.log(`\n[Uniswap] Fetching swap quote for ${formatTokenAmount(totalWld)} WLD → USDC...`);
   const uniswapQuote = await fetchUniswapQuote(totalWld);
 

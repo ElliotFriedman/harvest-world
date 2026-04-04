@@ -9,6 +9,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import {
   STRATEGY_ADDRESS,
   VAULT_ADDRESS,
+  WLD_ADDRESS,
   strategyAbi,
   vaultAbi,
   harvestStore,
@@ -73,7 +74,10 @@ async function harvest() {
     }
 
     // Uniswap quote — estimate swap output
-    const totalWld = rewards.reduce((sum: bigint, r: any) => sum + r.unclaimed, BigInt(0));
+    const wldRewards = rewards.filter(
+      (r) => r.token.toLowerCase() === WLD_ADDRESS.toLowerCase()
+    );
+    const totalWld = wldRewards.reduce((sum: bigint, r: any) => sum + r.unclaimed, BigInt(0));
     const uniswapQuote = await fetchUniswapQuote(totalWld);
 
     // 3. Build claim parameters from rewards

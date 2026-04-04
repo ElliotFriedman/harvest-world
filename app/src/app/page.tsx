@@ -337,8 +337,8 @@ export default function Terminal() {
         ? `${s.pendingRewards.amount} ($${s.pendingRewards.usdValue.toFixed(2)})`
         : "0 WLD";
 
-      const swapEstimate = (s as any).uniswapQuote
-        ? `~${(s as any).uniswapQuote.expectedOutput} (impact: ${(s as any).uniswapQuote.priceImpact}%)`
+      const swapEstimate = s.uniswapQuote
+        ? `~${s.uniswapQuote.expectedOutput} (impact: ${s.uniswapQuote.priceImpact}%)`
         : "";
 
       print(
@@ -361,8 +361,8 @@ export default function Terminal() {
     try {
       const result = await triggerHarvest();
       if (result.success) {
-        const quoteLine = (result as any).uniswapQuote
-          ? `  Swap quote:    ${(result as any).uniswapQuote.expectedOutput} (via Uniswap ${(result as any).uniswapQuote.routing})`
+        const quoteLine = result.uniswapQuote
+          ? `  Swap quote:    ${result.uniswapQuote.expectedOutput} (via Uniswap ${result.uniswapQuote.routing})`
           : "";
         print(
           "Harvest complete.",

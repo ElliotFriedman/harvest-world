@@ -42,7 +42,10 @@ export async function GET() {
     ]);
 
     // Uniswap quote for pending rewards
-    const totalPendingWld = merklRewards.reduce((sum: bigint, r: any) => sum + r.unclaimed, BigInt(0));
+    const wldRewards = merklRewards.filter(
+      (r) => r.token.toLowerCase() === WLD_ADDRESS.toLowerCase()
+    );
+    const totalPendingWld = wldRewards.reduce((sum: bigint, r: any) => sum + r.unclaimed, BigInt(0));
     const uniswapQuote = totalPendingWld > BigInt(0) ? await fetchUniswapQuote(totalPendingWld) : null;
 
     // Parse pending rewards (look for WLD specifically, or take first)
