@@ -102,8 +102,8 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v1.0 — DeFi, for humans.",
-    "World Chain yield aggregator. Type 'help' to start.",
+    "HARVEST v1.1 — Agentic DeFi, for humans.",
+    "World Chain yield aggregator.",
     "",
   ]);
   const [input, setInput] = useState("");
@@ -155,14 +155,12 @@ export default function Terminal() {
   async function handleHelp() {
     print(
       "Commands:",
-      "  vaults        — list vaults",
-      "  deposit <amt> — deposit USDC",
-      "  withdraw all  — withdraw all",
-      "  withdraw <n>  — withdraw $n",
-      "  portfolio     — your positions",
-      "  agent status  — harvester info",
-      "  agent harvest — manual harvest",
-      "  clear         — clear screen",
+      "  vaults       — list vaults + APY",
+      "  deposit <n>  — deposit USDC",
+      "  withdraw all — exit position",
+      "  portfolio    — your balance",
+      "  agent status — harvester info",
+      "  clear        — clear screen",
       ""
     );
   }
@@ -615,6 +613,42 @@ export default function Terminal() {
     }
   }
 
+  // ── Contextual shortcut buttons ─────────────────────────────────────────────
+
+  function getButtons(): { label: string; action: () => void }[] {
+    if (!walletAddress) {
+      return [{ label: "connect wallet", action: () => {
+        async function connect() {
+          try {
+            const result = await MiniKit.walletAuth({
+              nonce: crypto.randomUUID().replace(/-/g, ""),
+              statement: "Sign in to Harvest",
+            });
+            if (result?.data?.address) {
+              setWalletAddress(result.data.address);
+              print(`Connected: ${result.data.address.slice(0, 6)}...${result.data.address.slice(-4)}`, "");
+            }
+          } catch {
+            print("Error: Could not connect wallet.", "");
+          }
+        }
+        connect();
+      }}];
+    }
+    if (!isVerified) {
+      return [
+        { label: "vaults", action: () => handleCommand("vaults") },
+        { label: "deposit 50", action: () => handleCommand("deposit 50") },
+        { label: "help", action: () => handleCommand("help") },
+      ];
+    }
+    return [
+      { label: "deposit 50", action: () => handleCommand("deposit 50") },
+      { label: "portfolio", action: () => handleCommand("portfolio") },
+      { label: "withdraw all", action: () => handleCommand("withdraw all") },
+    ];
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -643,8 +677,36 @@ export default function Terminal() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Shortcut buttons (mobile UX) — contextual based on user state */}
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          paddingTop: "8px",
+          flexWrap: "wrap",
+        }}
+      >
+        {getButtons().map((btn) => (
+          <button
+            key={btn.label}
+            onClick={btn.action}
+            style={{
+              background: "transparent",
+              border: "1px solid #00ff41",
+              color: "#00ff41",
+              fontFamily: "inherit",
+              fontSize: "11px",
+              padding: "4px 8px",
+              cursor: "pointer",
+            }}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+
       {/* Input row */}
-      <div style={{ display: "flex", alignItems: "center", paddingTop: "8px" }}>
+      <div style={{ display: "flex", alignItems: "center", paddingTop: "6px" }}>
         <span style={{ marginRight: "8px" }}>harvest&gt;</span>
         <input
           ref={inputRef}
@@ -666,36 +728,6 @@ export default function Terminal() {
           autoCapitalize="off"
           autoCorrect="off"
         />
-      </div>
-
-      {/* Shortcut buttons (mobile UX) */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          paddingTop: "12px",
-          flexWrap: "wrap",
-        }}
-      >
-        {["vaults", "deposit 50", "portfolio", "agent status", "help"].map(
-          (cmd) => (
-            <button
-              key={cmd}
-              onClick={() => handleCommand(cmd)}
-              style={{
-                background: "transparent",
-                border: "1px solid #00ff41",
-                color: "#00ff41",
-                fontFamily: "inherit",
-                fontSize: "12px",
-                padding: "4px 10px",
-                cursor: "pointer",
-              }}
-            >
-              {cmd}
-            </button>
-          )
-        )}
       </div>
 
       {/* IDKit widget — rendered but only opened when needed */}
