@@ -3,4 +3,5 @@
 app/.env.local
 
 signing-key.json
+.harvester-wallet.json
 app/node_modules/
