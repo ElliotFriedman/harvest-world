@@ -89,6 +89,8 @@ export default function Terminal() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [hasShares, setHasShares] = useState(false);
+  const [depositMode, setDepositMode] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<bigint>(BigInt(0));
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -164,6 +166,25 @@ export default function Terminal() {
     if (!walletAddress) {
       print("Connect your wallet first. Tap 'get started' below.", "");
       return;
+    }
+
+    // Check balance before proceeding
+    try {
+      const { usdcBalance: bal } = await getBalances(walletAddress);
+      setUsdcBalance(bal);
+      const balanceUSD = Number(bal) / 1e6;
+      if (amount > balanceUSD) {
+        print(
+          `Insufficient balance: you have $${formatUSDC(balanceUSD)} USDC.`,
+          balanceUSD > 0
+            ? `Try 'deposit ${Math.floor(balanceUSD)}' or tap deposit for options.`
+            : "Top up your wallet first.",
+          ""
+        );
+        return;
+      }
+    } catch {
+      // balance check failed — let the tx attempt and fail naturally
     }
 
     if (!isVerified) {
@@ -291,6 +312,36 @@ export default function Terminal() {
   async function handleAgentHarvest() {
     print("Triggering manual harvest...");
     print("No pending rewards above threshold.", "");
+  }
+
+  // ── Deposit picker flow ──────────────────────────────────────────────────────
+
+  async function openDepositPicker() {
+    if (!walletAddress) {
+      print("Connect your wallet first. Tap 'get started'.", "");
+      return;
+    }
+    print("harvest> deposit", "Checking balance...");
+    try {
+      const { usdcBalance: bal } = await getBalances(walletAddress);
+      setUsdcBalance(bal);
+      if (bal === BigInt(0)) {
+        print("No USDC balance. Top up your wallet first.", "");
+        return;
+      }
+      setDepositMode(true);
+      print("Select amount:");
+    } catch {
+      print("Error: Could not fetch balance.", "");
+    }
+  }
+
+  async function onDepositAmount(amount: number | "max") {
+    setDepositMode(false);
+    const resolvedAmount =
+      amount === "max" ? Number(usdcBalance) / 1e6 : amount;
+    print(`  → $${formatUSDC(resolvedAmount)}`);
+    await handleDeposit([resolvedAmount.toString()]);
   }
 
   // ── IDKit flow (backend-only verification) ─────────────────────────────────
@@ -528,19 +579,41 @@ export default function Terminal() {
 
   // ── Contextual shortcut buttons ─────────────────────────────────────────────
 
-  function getButtons(): { label: string; action: () => void }[] {
+  function getButtons(): { label: string; action: () => void; disabled?: boolean }[] {
+    // Deposit amount picker — shown after openDepositPicker() fetches the balance
+    if (depositMode) {
+      const balanceUSD = Number(usdcBalance) / 1e6;
+      return [
+        ...[10, 25, 50, 100].map((amt) => ({
+          label: `$${amt}`,
+          action: () => onDepositAmount(amt),
+          disabled: amt > balanceUSD,
+        })),
+        {
+          label: `MAX ($${formatUSDC(balanceUSD)})`,
+          action: () => onDepositAmount("max"),
+          disabled: false,
+        },
+        {
+          label: "cancel",
+          action: () => { setDepositMode(false); print("Cancelled.", ""); },
+          disabled: false,
+        },
+      ];
+    }
+
     if (!walletAddress || !isVerified) {
       return [{ label: "get started", action: handleGetStarted }];
     }
     if (hasShares) {
       return [
-        { label: "deposit", action: () => handleCommand("deposit 50") },
+        { label: "deposit", action: openDepositPicker },
         { label: "portfolio", action: () => handleCommand("portfolio") },
         { label: "withdraw all", action: () => handleCommand("withdraw all") },
       ];
     }
     return [
-      { label: "deposit", action: () => handleCommand("deposit 50") },
+      { label: "deposit", action: openDepositPicker },
       { label: "portfolio", action: () => handleCommand("portfolio") },
     ];
   }
@@ -583,7 +656,7 @@ export default function Terminal() {
         {getButtons().map((btn) => (
           <button
             key={btn.label}
-            onClick={btn.action}
+            onClick={btn.disabled ? undefined : btn.action}
             style={{
               background: "transparent",
               border: "1px solid #00ff41",
@@ -591,7 +664,8 @@ export default function Terminal() {
               fontFamily: "inherit",
               fontSize: "11px",
               padding: "4px 8px",
-              cursor: "pointer",
+              cursor: btn.disabled ? "default" : "pointer",
+              opacity: btn.disabled ? 0.3 : 1,
             }}
           >
             {btn.label}
