@@ -131,7 +131,7 @@ This section exists for one reason: to show judges we went all-in.
 | Metric | Count |
 |--------|-------|
 | Total commits | **178** |
-| Merged pull requests | **98** |
+| Merged pull requests | **99** |
 | GitHub issues tracked | **90+** |
 | Solidity (30 files) | **2,710 lines** |
 | TypeScript (17 files) | **1,807 lines** |
@@ -152,7 +152,7 @@ This section exists for one reason: to show judges we went all-in.
 ### Merged Pull Requests
 
 <details>
-<summary>98 merged PRs across 9 categories — click to expand</summary>
+<summary>99 merged PRs across 9 categories — click to expand</summary>
 
 #### Infrastructure & CI
 | PR | Description |
@@ -234,6 +234,7 @@ This section exists for one reason: to show judges we went all-in.
 | [#96](https://github.com/ElliotFriedman/harvest-world/pull/96) | fix: observer mode only on desktop (250ms MiniKit init delay), copy button, v2.5 |
 | [#97](https://github.com/ElliotFriedman/harvest-world/pull/97) | docs: break out LOC by language — 19,400 total lines |
 | [#98](https://github.com/ElliotFriedman/harvest-world/pull/98) | fix: restore working Certora report URLs, fix invariant base case |
+| [#99](https://github.com/ElliotFriedman/harvest-world/pull/99) | docs: on-chain Uniswap tx evidence + screenshot, Proof of Work stats update |
 
 #### Security & Docs
 | PR | Description |
