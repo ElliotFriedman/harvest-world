@@ -130,10 +130,10 @@ This section exists for one reason: to show judges we went all-in.
 
 | Metric | Count |
 |--------|-------|
-| Total commits | **152** |
-| Merged pull requests | **92** |
+| Total commits | **160** |
+| Merged pull requests | **94** |
 | GitHub issues tracked | **90+** |
-| Lines of code (Solidity + TypeScript) | **2,809** |
+| Lines of code (Solidity + TypeScript) | **3,020** |
 | Build window | **36 hours** (ETHGlobal Cannes, Apr 3–5 2026) |
 
 [View commit frequency →](https://github.com/ElliotFriedman/harvest-world/graphs/commit-activity)
@@ -149,7 +149,7 @@ This section exists for one reason: to show judges we went all-in.
 ### Merged Pull Requests
 
 <details>
-<summary>92 merged PRs across 8 categories — click to expand</summary>
+<summary>94 merged PRs across 9 categories — click to expand</summary>
 
 #### Infrastructure & CI
 | PR | Description |
@@ -223,11 +223,19 @@ This section exists for one reason: to show judges we went all-in.
 |----|-------------|
 | [#91](https://github.com/ElliotFriedman/harvest-world/pull/91) | feat: integrate Uniswap Trading API for swap intelligence |
 | [#92](https://github.com/ElliotFriedman/harvest-world/pull/92) | feat: show streaming yield unlock countdown in agent status |
+| [#95](https://github.com/ElliotFriedman/harvest-world/pull/95) | feat: observer mode boot sequence, QR deeplink, 4 new terminal commands (gm, oracle, roots, scan) |
+
+#### Fixes & Polish
+| PR | Description |
+|----|-------------|
+| [#96](https://github.com/ElliotFriedman/harvest-world/pull/96) | fix: observer mode only on desktop (250ms MiniKit init delay), copy button, v2.5 |
 
 #### Security & Docs
 | PR | Description |
 |----|-------------|
 | [#86](https://github.com/ElliotFriedman/harvest-world/pull/86) | docs: internal security audit |
+| [#93](https://github.com/ElliotFriedman/harvest-world/pull/93) | docs: add README, CLAUDE.md, Claude skills config |
+| [#94](https://github.com/ElliotFriedman/harvest-world/pull/94) | docs: add Proof of Work section to README |
 
 </details>
 
@@ -337,3 +345,7 @@ We used first-party AI tooling from both prize sponsors as active development in
 # Uniswap AI skill used during development
 npx skills add uniswap/uniswap-ai --skill swap-integration
 ```
+
+---
+
+*There's at least one easter egg hidden in the terminal. You'll know it when you find it.*
