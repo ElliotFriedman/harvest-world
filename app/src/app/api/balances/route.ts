@@ -5,7 +5,13 @@ import { createPublicClient, http } from "viem";
 const RPC_URL = process.env.RPC_URL || "https://worldchain.drpc.org";
 
 const client = createPublicClient({
-  chain: { id: 480, name: "World Chain", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [RPC_URL] } } },
+  chain: {
+    id: 480,
+    name: "World Chain",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [RPC_URL] } },
+    contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" } },
+  },
   transport: http(RPC_URL),
 });
 
