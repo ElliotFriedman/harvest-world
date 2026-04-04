@@ -1,3 +1,9 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/agent/harvest",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }

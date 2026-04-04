@@ -78,7 +78,7 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v2.2 — Agentic DeFi, for humans.",
+    "HARVEST v2.3 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
@@ -311,19 +311,56 @@ export default function Terminal() {
   }
 
   async function handleAgentStatus() {
-    print(
-      "HARVESTER AGENT",
-      "  Status:         ● ACTIVE",
-      "  Last harvest:   never",
-      "  Next check:     in ~6h",
-      "  Pending yield:  0 WLD",
-      ""
-    );
+    print("Loading agent status...");
+    try {
+      const s = await getAgentStatus();
+      const lastTime = s.lastHarvest
+        ? new Date(s.lastHarvest.timestamp).toLocaleString()
+        : "never";
+      const nextTime = new Date(s.nextCheck).toLocaleString();
+      const poolUsdc = s.balanceOfPool
+        ? `$${(Number(s.balanceOfPool) / 1e6).toFixed(2)}`
+        : "unknown";
+      const pending = s.pendingRewards
+        ? `${s.pendingRewards.amount} ($${s.pendingRewards.usdValue})`
+        : "none";
+
+      print(
+        "HARVESTER AGENT",
+        `  Status:         ● ${s.status.toUpperCase()}`,
+        `  Pool balance:   ${poolUsdc}`,
+        `  Last harvest:   ${lastTime}`,
+        `  Next check:     ${nextTime}`,
+        `  Pending yield:  ${pending}`,
+        ""
+      );
+    } catch {
+      print("Error loading agent status. Try again.", "");
+    }
   }
 
   async function handleAgentHarvest() {
     print("Triggering manual harvest...");
-    print("No pending rewards above threshold.", "");
+    try {
+      const result = await triggerHarvest();
+      if (result.success) {
+        print(
+          "Harvest complete!",
+          `  Rewards claimed: ${result.rewardsClaimed ?? "—"}`,
+          `  Want earned:     ${result.wantEarned ?? "—"}`,
+          `  Tx: ${result.txHash?.slice(0, 10)}...`,
+          ""
+        );
+      } else {
+        print(
+          `Harvest skipped: ${result.reason ?? "unknown"}`,
+          result.message ?? "",
+          ""
+        );
+      }
+    } catch {
+      print("Error triggering harvest. Try again.", "");
+    }
   }
 
   // ── Easter egg ──────────────────────────────────────────────────────────────

@@ -3,8 +3,12 @@
 // Used by /api/agent/status and /api/agent/harvest routes.
 // ---------------------------------------------------------------------------
 
-export const STRATEGY_ADDRESS = "0xd2753e1Ce625A776A4d73f0251419Ba5Dfc1c0A5" as const;
-export const VAULT_ADDRESS = "0xDA3cF80dC04F527563a40Ce17A5466d6A05eefBD" as const;
+export const STRATEGY_ADDRESS = (
+  process.env.NEXT_PUBLIC_STRATEGY_ADDRESS ?? "0x313ba1d5d5aa1382a80ba839066a61d33c110489"
+) as `0x${string}`;
+export const VAULT_ADDRESS = (
+  process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? "0x512ce44e4f69a98bc42a57ced8257e65e63cd74f"
+) as `0x${string}`;
 export const WLD_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" as const;
 
 // ─── ABIs ─────────────────────────────────────────────────────────────────────
