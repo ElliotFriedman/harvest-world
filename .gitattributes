@@ -1,0 +1,7 @@
+# Normalize line endings for cross-platform (Linux CI + Windows devs)
+* text=auto
+
+*.yml text eol=lf
+*.yaml text eol=lf
+.env.example text eol=lf
+.env*.local text eol=lf
