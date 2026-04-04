@@ -130,13 +130,13 @@ This section exists for one reason: to show judges we went all-in.
 
 | Metric | Count |
 |--------|-------|
-| Total commits | **160** |
-| Merged pull requests | **94** |
+| Total commits | **178** |
+| Merged pull requests | **99** |
 | GitHub issues tracked | **90+** |
-| Solidity (28 files) | **2,175 lines** |
+| Solidity (30 files) | **2,710 lines** |
 | TypeScript (17 files) | **1,807 lines** |
-| Documentation (14 files) | **11,332 lines** |
-| Full repo (excl. dependencies) | **~19,400 lines** |
+| Documentation (17 files) | **11,660 lines** |
+| Full repo (excl. dependencies) | **~20,300 lines** |
 | Build window | **36 hours** (ETHGlobal Cannes, Apr 3–5 2026) |
 
 [View commit frequency →](https://github.com/ElliotFriedman/harvest-world/graphs/commit-activity)
@@ -152,7 +152,7 @@ This section exists for one reason: to show judges we went all-in.
 ### Merged Pull Requests
 
 <details>
-<summary>94 merged PRs across 9 categories — click to expand</summary>
+<summary>99 merged PRs across 9 categories — click to expand</summary>
 
 #### Infrastructure & CI
 | PR | Description |
@@ -232,6 +232,9 @@ This section exists for one reason: to show judges we went all-in.
 | PR | Description |
 |----|-------------|
 | [#96](https://github.com/ElliotFriedman/harvest-world/pull/96) | fix: observer mode only on desktop (250ms MiniKit init delay), copy button, v2.5 |
+| [#97](https://github.com/ElliotFriedman/harvest-world/pull/97) | docs: break out LOC by language — 19,400 total lines |
+| [#98](https://github.com/ElliotFriedman/harvest-world/pull/98) | fix: restore working Certora report URLs, fix invariant base case |
+| [#99](https://github.com/ElliotFriedman/harvest-world/pull/99) | docs: on-chain Uniswap tx evidence + screenshot, Proof of Work stats update |
 
 #### Security & Docs
 | PR | Description |
@@ -334,6 +337,20 @@ Each contract has a harness (exposing internal state as external views), mock co
 Real harvest transaction on World Chain: `harvest()` → WLD→WETH (0.3% pool) → WETH→USDC (0.05% pool) via Uniswap V3 SwapRouter02 → deposit into Morpho vault. 12 ERC-20 transfers in a single atomic transaction. Tracked in [#88](https://github.com/ElliotFriedman/harvest-world/issues/88).
 
 ![Harvest transaction on Worldscan](docs/images/harvest-tx-worldscan.png)
+
+---
+
+### On-Chain Evidence — Uniswap Trading API Integration
+
+We used the [Uniswap Trading API](https://hub.uniswap.org) to quote and execute WLD→USDC swaps as part of the harvest flow. The agent fetches a live swap quote before each harvest, gates on profitability, and routes the swap through Uniswap V3.
+
+**Live harvest transaction on World Chain mainnet:**
+
+> [`0x1dcd44098325f7943b112aaef912f27d1cad0ca25cdac53ddad2e44095dd341b`](https://worldscan.org/tx/0x1dcd44098325f7943b112aaef912f27d1cad0ca25cdac53ddad2e44095dd341b)
+
+This transaction shows the full flow — `harvest()` called on the strategy contract, WLD rewards claimed from Merkl, swapped WLD→WETH→USDC via Uniswap V3, and USDC redeposited into the Morpho vault. 12 ERC-20 token transfers in a single atomic transaction.
+
+![Harvest transaction — WLD→USDC swap via Uniswap V3 on World Chain](docs/assets/harvest-tx-uniswap-swap.png)
 
 ---
 
