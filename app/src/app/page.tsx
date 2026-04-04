@@ -326,23 +326,6 @@ export default function Terminal() {
     print("No pending rewards above threshold.", "");
   }
 
-  // ── Easter egg ──────────────────────────────────────────────────────────────
-
-  async function handleEasterEgg() {
-    await typewriterPrint("* you found the easter egg. congrats. *");
-    await new Promise<void>((r) => setTimeout(r, 500));
-    print("");
-    await typewriterPrint("we wanted to add the wonder back into finance.");
-    await new Promise<void>((r) => setTimeout(r, 200));
-    await typewriterPrint("the feeling of getting a new computer.");
-    await new Promise<void>((r) => setTimeout(r, 200));
-    await typewriterPrint("and entering a whole new world...");
-    await new Promise<void>((r) => setTimeout(r, 600));
-    print("");
-    await typewriterPrint("we hope you enjoy :)");
-    print("");
-  }
-
   // ── Deposit picker flow ──────────────────────────────────────────────────────
 
   async function openDepositPicker() {
@@ -452,11 +435,12 @@ export default function Terminal() {
     try {
       const amountRaw = BigInt(Math.floor(amount * 1e6));
 
-      const expiration = Math.floor(Date.now() / 1000) + 60; // 1 minute from now
+      // set to zero per world docs.
+      const expiration = 0;
       const approveCalldata = encodeFunctionData({
         abi: PERMIT2_APPROVE_ABI,
         functionName: "approve",
-        args: [USDC_ADDRESS, VAULT_ADDRESS, amountRaw, expiration],
+        args: [USDC_ADDRESS, VAULT_ADDRESS, amountRaw, 0],
       });
 
       const depositCalldata = encodeFunctionData({
@@ -593,8 +577,6 @@ export default function Terminal() {
       await handleAgentHarvest();
     } else if (cmd === "clear") {
       setLines([]);
-    } else if (trimmed === "easter egg") {
-      await handleEasterEgg();
     } else {
       print(`Unknown command: '${cmd}'. Type 'help' for options.`, "");
     }
