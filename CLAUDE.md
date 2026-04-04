@@ -47,7 +47,7 @@ The `README.md` contains a `## Proof of Work` section that judges read to assess
 
 Specifically:
 - Add the new PR to the correct category table inside the `<details>` block (Infrastructure, Contracts, World ID, Permit2, Mini App, Agent, Features, Security)
-- Update the **Development Velocity** stats table: increment the merged PR count, update total commit count (`git log --oneline | wc -l`), and update the LOC count if significant code was added
+- Update the **Development Velocity** stats table: increment the merged PR count, update total commit count (`git log --oneline | wc -l`), and update the LOC count (`cloc contracts/src app/src agent/src --quiet | tail -3` — update the SUM code line)
 - If the PR closes an issue, move that issue from the **Roadmap** list to the **Completed** table
 - If a new category of work was introduced (e.g. a new area of the codebase), add a new category table inside `<details>`
 
