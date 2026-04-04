@@ -383,36 +383,42 @@ export default function Terminal() {
       }
 
       try {
-        // Support both v3 (legacy) and v4 response formats
+        // Debug: show raw result structure
+        print(`IDKit result keys: ${JSON.stringify(Object.keys(result))}`);
+        print(`Responses count: ${result.responses?.length ?? "undefined"}`);
+
         const response = result.responses[0];
         if (!response) {
           print("Error: No credential response from World ID.", "");
+          print(`Full result: ${JSON.stringify(result).slice(0, 200)}`);
           return;
         }
+
+        print(`Response keys: ${JSON.stringify(Object.keys(response))}`);
 
         let root: bigint;
         let nullifierHash: bigint;
         let proofArray: readonly [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
 
         if ("merkle_root" in response) {
-          // V3 legacy format: proof is a single packed hex, merkle_root/nullifier are separate fields
+          // V3 legacy format
           const v3 = response as ResponseItemV3;
           root = BigInt(v3.merkle_root);
           nullifierHash = BigInt(v3.nullifier);
           const decoded = decodeProof(v3.proof);
-          proofArray = decoded as unknown as typeof proofArray;
+          proofArray = decoded.map((d) => BigInt(d)) as unknown as typeof proofArray;
+          print(`V3 format — root: ${root.toString().slice(0, 10)}...`);
         } else if ("nullifier" in response) {
-          // V4 format: proof is string[] where [0..3] are proof elements, [4] is merkle root
           const v4 = response as ResponseItemV4;
           root = BigInt(v4.proof[4]);
           nullifierHash = BigInt(v4.nullifier);
-          // The on-chain verifier expects 8 uint256s; v4 compressed proof has 4 elements
-          // Pad with zeros for the 8-element array the contract expects
           const elements = v4.proof.slice(0, 4).map((p) => BigInt(p));
           while (elements.length < 8) elements.push(BigInt(0));
           proofArray = elements as unknown as typeof proofArray;
+          print(`V4 format — root: ${root.toString().slice(0, 10)}...`);
         } else {
-          print("Error: Unsupported proof format from World ID.", "");
+          print("Error: Unsupported proof format.", "");
+          print(`Response: ${JSON.stringify(response).slice(0, 200)}`);
           return;
         }
 
@@ -432,8 +438,10 @@ export default function Terminal() {
           ],
         });
 
+        print(`sendTransaction result: ${JSON.stringify(data).slice(0, 200)}`);
+
         if (data.status !== "success") {
-          print("Error: On-chain verification transaction failed.", "");
+          print(`Error: tx failed — status=${data.status}`, "");
           return;
         }
 
