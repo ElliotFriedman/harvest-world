@@ -2523,6 +2523,8 @@ See `contracts/certora/README.md` for full documentation.
 
 This transaction demonstrates the full harvest pipeline executing onchain: Merkl reward claiming, multi-hop Uniswap V3 swap routing, and Morpho vault redeposit — all in a single atomic transaction.
 
+![Harvest transaction on Worldscan](images/harvest-tx-worldscan.png)
+
 Tracked in: [ElliotFriedman/harvest-world#88](https://github.com/ElliotFriedman/harvest-world/issues/88)
 
 ---
