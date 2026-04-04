@@ -2456,6 +2456,56 @@ vault.deposit(1e6); // Seed deposit to prevent first-depositor attack
 - With `amountOutMinimum = 0`, a manipulated pool could cause bad swaps.
 - Acceptable for hackathon. Production fix: Chainlink oracle + slippage check.
 
+### 5.7 Formal Verification (Certora Prover)
+
+Harvest uses the [Certora Prover](https://docs.certora.com/) for formal verification of the three core contracts. Specs live under `contracts/certora/`.
+
+**What is formal verification?**
+Unlike fuzzing or unit tests which explore a finite set of inputs, the Certora Prover uses SMT solvers to reason about *all possible states and inputs*. A verified rule is a mathematical proof that the property holds universally — not just on the test cases we thought to write.
+
+**Verified contracts and properties:**
+
+| Contract | Spec file | Rules | Key invariants |
+|----------|-----------|-------|----------------|
+| `BeefyVaultV7` | `certora/specs/BeefyVaultV7.spec` | 17 rules | Share minting/burning correctness, balance accounting, price-per-share monotonicity, access control |
+| `BaseAllToNativeFactoryStrat` | `certora/specs/BaseStrategy.spec` | 16 rules | Locked profit decay, balanceOf identity, vault-only gating, pause/panic safety |
+| `StrategyMorphoMerkl` | `certora/specs/StrategyMorphoMerkl.spec` | 14 rules | Morpho pool balance identity, deposit/withdraw round-trip, claim isolation |
+| `BeefySwapper` | `certora/specs/BeefySwapper.spec` | 15 rules | Slippage never exceeds 100%, swap reverts without route, owner-only admin |
+
+**Critical properties proven:**
+
+1. **Share minting correctness** — First deposit mints exactly `amount` shares. Subsequent deposits mint `amount × totalSupply / balance`. No rounding can over-issue shares.
+
+2. **Withdrawal correctness** — Users receive `shares × balance / totalSupply` tokens. A deposit-then-withdraw round-trip never returns more than deposited.
+
+3. **No share dilution from harvests** — `getPricePerFullShare()` never decreases when `addYield()` is called on the strategy. Harvests can only increase or maintain share value.
+
+4. **Locked profit decay** — `lockedProfit()` is always <= `totalLocked`, always >= 0, and decays to exactly 0 after `lockDuration` seconds. The `balanceOf()` identity `want + pool - lockedProfit` holds universally.
+
+5. **Slippage protection** — `slippage` is permanently bounded by `1e18` (100%). Setting slippage to > 1e18 always reverts. The oracle-based swap path always enforces `output >= minAmountOut`.
+
+6. **Access control** — Every privileged function (`setStrategy`, `addReward`, `setSwapInfo`, `panic`, etc.) is proven to revert for any caller that isn't the authorized role.
+
+7. **Vault-only strategy calls** — `deposit()`, `withdraw()`, and `retireStrat()` on the strategy revert for any caller that isn't the vault. No external actor can move funds through the strategy directly.
+
+**Running the verifier:**
+
+```bash
+cd contracts
+export CERTORAKEY=your_key_here  # obtain from certora.com
+
+# Run all specs
+bash certora/run_all.sh
+
+# Or run individually
+certoraRun certora/confs/BeefyVaultV7.conf
+certoraRun certora/confs/BaseStrategy.conf
+certoraRun certora/confs/StrategyMorphoMerkl.conf
+certoraRun certora/confs/BeefySwapper.conf
+```
+
+See `contracts/certora/README.md` for full documentation on the harness design, spec structure, and interpreting results.
+
 ---
 
 <!-- Interface verified against Permit2 source at lib/permit2/src/AllowanceTransfer.sol
