@@ -2510,6 +2510,21 @@ certoraRun certora/confs/StrategyMorphoMerkl.conf
 
 See `contracts/certora/README.md` for full documentation.
 
+### 5.8 Proof of Work — Onchain Execution
+
+**Harvest transaction (WLD→USDC swap via Uniswap V3 on World Chain):**
+
+- **Tx:** [`0x1dcd44098325f7943b112aaef912f27d1cad0ca25cdac53ddad2e44095dd341b`](https://worldscan.org/tx/0x1dcd44098325f7943b112aaef912f27d1cad0ca25cdac53ddad2e44095dd341b)
+- **Chain:** World Chain (480)
+- **Contract:** Strategy `0x313bA1D5D5AA1382a80BA839066A61d33C110489`
+- **Router:** Uniswap V3 SwapRouter02 `0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6`
+- **Flow:** `harvest()` → WLD→WETH (0.3% pool) → WETH→USDC (0.05% pool) → deposit into Morpho vault
+- **Result:** Real WLD rewards swapped to USDC and auto-compounded for all vault depositors
+
+This transaction demonstrates the full harvest pipeline executing onchain: Merkl reward claiming, multi-hop Uniswap V3 swap routing, and Morpho vault redeposit — all in a single atomic transaction.
+
+Tracked in: [ElliotFriedman/harvest-world#88](https://github.com/ElliotFriedman/harvest-world/issues/88)
+
 ---
 
 <!-- Interface verified against Permit2 source at lib/permit2/src/AllowanceTransfer.sol
