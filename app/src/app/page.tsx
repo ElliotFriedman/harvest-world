@@ -2,13 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  IDKitRequestWidget,
-  IDKitResult,
-  IDKitErrorCodes,
-  RpContext,
-  ResponseItemV3,
-  ResponseItemV4,
-  orbLegacy,
+  IDKitWidget,
+  ISuccessResult,
+  VerificationLevel,
 } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData, decodeAbiParameters } from "viem";
@@ -104,15 +100,13 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v1.2 — Agentic DeFi, for humans.",
+    "HARVEST v1.3 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
   const [input, setInput] = useState("");
   const [pendingDeposit, setPendingDeposit] = useState<number | null>(null);
   const [idkitOpen, setIdkitOpen] = useState(false);
-  const [rpContext, setRpContext] = useState<RpContext | null>(null);
-  const [currentPreset, setCurrentPreset] = useState<ReturnType<typeof orbLegacy> | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [hasShares, setHasShares] = useState(false);
@@ -439,25 +433,18 @@ export default function Terminal() {
       setPendingDeposit(null);
       return;
     }
-
-    try {
-      const res = await fetch("/api/sign-request");
-      if (!res.ok) throw new Error("Failed to fetch RP signature");
-      const ctx: RpContext = await res.json();
-      setRpContext(ctx);
-      setCurrentPreset(orbLegacy({ signal: walletAddress }));
-      setIdkitOpen(true);
-    } catch {
-      print("Error: Could not initialize World ID verification.", "");
-      setPendingDeposit(null);
-    }
+    setIdkitOpen(true);
   }
 
-  async function handleVerify(result: IDKitResult): Promise<void> {
+  async function handleVerify(result: ISuccessResult): Promise<void> {
     const res = await fetch("/api/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(result),
+      body: JSON.stringify({
+        ...result,
+        action: "verify-human",
+        signal: walletAddress,
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -466,84 +453,25 @@ export default function Terminal() {
   }
 
   const handleIdkitSuccess = useCallback(
-    async (result: IDKitResult) => {
+    async (result: ISuccessResult) => {
       setIdkitOpen(false);
-      print("[DEBUG] handleIdkitSuccess called");
-      print(`[DEBUG] walletAddress at entry: ${walletAddress ?? "null"}`);
-      print(`[DEBUG] raw IDKit result: ${JSON.stringify(result).slice(0, 300)}`);
       print("World ID verified. Registering on-chain...");
 
-      if (!MiniKit.isInstalled()) {
+      if (!MiniKit.isInstalled() || !walletAddress) {
         print("Error: MiniKit not available.", "");
         return;
       }
 
       try {
-        const response = result.responses[0];
-        if (!response) {
-          print("Error: No credential response from World ID.", "");
-          return;
-        }
-
-        let root: bigint;
-        let nullifierHash: bigint;
-        let proofArray: readonly [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
-
-        if ("merkle_root" in response) {
-          // V3 legacy format
-          print("[DEBUG] Branch: V3 legacy format (merkle_root found)");
-          const v3 = response as ResponseItemV3;
-          const rawProofHex = v3.proof as string;
-          print(`[DEBUG] Raw proof hex (first 100): ${rawProofHex.slice(0, 100)}`);
-          print(`[DEBUG] Raw proof hex LENGTH: ${rawProofHex.length} chars (512=raw-packed, 576=ABI-encoded)`);
-          root = BigInt(v3.merkle_root);
-          nullifierHash = BigInt(v3.nullifier);
-          const decoded = decodeProof(v3.proof as `0x${string}`);
-          print(`[DEBUG] Decoded proof element [0]: 0x${decoded[0].toString(16)}`);
-          print(`[DEBUG] Decoded proof element [1]: 0x${decoded[1].toString(16)}`);
-          print(`[DEBUG] Decoded proof element [2]: 0x${decoded[2].toString(16)}`);
-          print(`[DEBUG] Decoded proof element [3]: 0x${decoded[3].toString(16)}`);
-          print(`[DEBUG] Decoded proof element [4]: 0x${decoded[4].toString(16)}`);
-          print(`[DEBUG] Decoded proof element [5]: 0x${decoded[5].toString(16)}`);
-          print(`[DEBUG] Decoded proof element [6]: 0x${decoded[6].toString(16)}`);
-          print(`[DEBUG] Decoded proof element [7]: 0x${decoded[7].toString(16)}`);
-          proofArray = decoded.map((d) => BigInt(d)) as unknown as typeof proofArray;
-        } else if ("nullifier" in response) {
-          print("[DEBUG] Branch: V4 format (nullifier found, no merkle_root)");
-          const v4 = response as ResponseItemV4;
-          const rawProofStr = JSON.stringify(v4.proof);
-          print(`[DEBUG] Raw v4 proof array (first 100): ${rawProofStr.slice(0, 100)}`);
-          print(`[DEBUG] v4 proof array length: ${v4.proof.length}`);
-          root = BigInt(v4.proof[4]);
-          nullifierHash = BigInt(v4.nullifier);
-          const elements = v4.proof.slice(0, 4).map((p) => BigInt(p));
-          while (elements.length < 8) elements.push(BigInt(0));
-          print(`[DEBUG] V4 proof element [0]: 0x${elements[0].toString(16)}`);
-          print(`[DEBUG] V4 proof element [1]: 0x${elements[1].toString(16)}`);
-          print(`[DEBUG] V4 proof element [2]: 0x${elements[2].toString(16)}`);
-          print(`[DEBUG] V4 proof element [3]: 0x${elements[3].toString(16)}`);
-          print(`[DEBUG] V4 proof element [4]: 0x${elements[4].toString(16)}`);
-          print(`[DEBUG] V4 proof element [5]: 0x${elements[5].toString(16)}`);
-          print(`[DEBUG] V4 proof element [6]: 0x${elements[6].toString(16)}`);
-          print(`[DEBUG] V4 proof element [7]: 0x${elements[7].toString(16)}`);
-          proofArray = elements as unknown as typeof proofArray;
-        } else {
-          print("Error: Unsupported proof format.", "");
-          return;
-        }
-
-        print(`[DEBUG] root (full): ${root.toString()}`);
-        print(`[DEBUG] nullifierHash (full): ${nullifierHash.toString()}`);
-        print(`[DEBUG] signal (walletAddress): ${walletAddress ?? "null"}`);
+        const root = BigInt(result.merkle_root);
+        const nullifierHash = BigInt(result.nullifier_hash);
+        const proofArray = decodeProof(result.proof as `0x${string}`) as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
 
         const verifyCalldata = encodeFunctionData({
           abi: VERIFY_HUMAN_ABI,
           functionName: "verifyHuman",
           args: [root, nullifierHash, proofArray],
         });
-
-        print(`[DEBUG] Encoded calldata (first 100): ${(verifyCalldata as string).slice(0, 100)}`);
-        print(`[DEBUG] VAULT_ADDRESS being called: ${VAULT_ADDRESS}`);
 
         const { data } = await MiniKit.sendTransaction({
           chainId: WORLD_CHAIN_ID,
@@ -554,8 +482,6 @@ export default function Terminal() {
             },
           ],
         });
-
-        print(`[DEBUG] Full MiniKit sendTransaction result: ${JSON.stringify(data)}`);
 
         if (data.status !== "success") {
           print(`Error: tx failed — status=${data.status}`, "");
@@ -744,16 +670,7 @@ export default function Terminal() {
 
     // Step 2: immediately open IDKit for World ID verification
     print("Verifying humanity...");
-    try {
-      const res = await fetch("/api/sign-request");
-      if (!res.ok) throw new Error("Failed to fetch RP signature");
-      const ctx: RpContext = await res.json();
-      setRpContext(ctx);
-      setCurrentPreset(orbLegacy({ signal: addr }));
-      setIdkitOpen(true);
-    } catch {
-      print("Error: Could not start verification.", "");
-    }
+    setIdkitOpen(true);
   }
 
   // ── Input handling ───────────────────────────────────────────────────────────
@@ -898,26 +815,28 @@ export default function Terminal() {
         />
       </div>
 
-      {/* IDKit widget — only rendered when preset and wallet are fresh */}
-      {rpContext && currentPreset && walletAddress && (
-        <IDKitRequestWidget
+      {/* IDKit v2 widget — render prop pattern */}
+      {walletAddress && (
+        <IDKitWidget
           app_id={APP_ID}
           action="verify-human"
-          rp_context={rpContext}
-          allow_legacy_proofs={true}
-          preset={currentPreset}
-          open={idkitOpen}
-          onOpenChange={setIdkitOpen}
+          signal={walletAddress}
+          verification_level={VerificationLevel.Orb}
           handleVerify={handleVerify}
           onSuccess={handleIdkitSuccess}
-          onError={(errorCode: IDKitErrorCodes) => {
-            print(`[DEBUG] IDKit onError callback fired`);
-            print(`[DEBUG] Full error code: ${JSON.stringify(errorCode)}`);
-            print(`World ID error: ${errorCode}`, "");
+          onError={(error) => {
+            print(`World ID error: ${JSON.stringify(error)}`, "");
             setIdkitOpen(false);
             setPendingDeposit(null);
           }}
-        />
+        >
+          {({ open }) => {
+            if (idkitOpen) {
+              setTimeout(open, 0);
+            }
+            return <></>;
+          }}
+        </IDKitWidget>
       )}
     </div>
   );
