@@ -55,7 +55,7 @@ methods {
     function strat.getTotalLocked()          external returns (uint256) envfree;
     function strat.getLockDuration()         external returns (uint256) envfree;
     function strat.getLastHarvest()          external returns (uint256) envfree;
-    function strat.getHarvestOnDeposit()     external returns (bool)    envfree;
+    function strat.harvestOnDeposit()         external returns (bool)    envfree;
     function strat.currentOwner()            external returns (address) envfree;
     function strat.morphoSharesHeld()        external returns (uint256);
     function strat.currentLockedProfit()     external returns (uint256);
@@ -265,7 +265,7 @@ rule onlyVaultCanWithdraw(uint256 amount) {
     require e.msg.sender != vaultAddr;
     require e.msg.value == 0;
 
-    withdraw@withrevert(e, amount);
+    strat.withdraw@withrevert(e, amount);
 
     assert lastReverted,
         "withdraw() must revert for callers that are not the vault";
@@ -282,7 +282,7 @@ rule onlyVaultCanRetire() {
     require e.msg.sender != vaultAddr;
     require e.msg.value == 0;
 
-    retireStrat@withrevert(e);
+    strat.retireStrat@withrevert(e);
 
     assert lastReverted,
         "retireStrat() must revert for callers that are not the vault";
@@ -373,7 +373,7 @@ rule onlyManagerCanPanic() {
     require e.msg.sender != mgr;
     require e.msg.value == 0;
 
-    panic@withrevert(e);
+    strat.panic@withrevert(e);
     assert lastReverted, "panic() must revert for non-manager callers";
 }
 
@@ -417,7 +417,7 @@ rule panicPausesContract() {
     require !strat.paused();
     require e.msg.value == 0;
 
-    panic@withrevert(e);
+    strat.panic@withrevert(e);
 
     assert !lastReverted => strat.paused(),
         "panic() must leave the contract in a paused state when it succeeds";
@@ -446,7 +446,7 @@ rule panicWithdrawsAll() {
     require !strat.paused();
     require e.msg.value == 0;
 
-    panic@withrevert(e);
+    strat.panic@withrevert(e);
 
     assert !lastReverted => strat.paused(),
         "panic() must set paused = true (prerequisite for fund-safety guarantees)";
@@ -490,7 +490,7 @@ rule harvestUpdatesLastHarvest() {
     // We use a symbolic assume rather than a concrete value.
     require e.block.timestamp > strat.getLastHarvest();
 
-    harvest@withrevert(e);
+    strat.harvest@withrevert(e);
 
     assert !lastReverted => strat.getLastHarvest() <= e.block.timestamp,
         "lastHarvest must never exceed block.timestamp after harvest()";
