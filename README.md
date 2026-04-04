@@ -53,6 +53,7 @@ This is what "DeFi, for humans" actually means at scale.
 | BeefyVaultV7 + StrategyMorpho on World Chain mainnet | Deployed |
 | World ID deposit gate (Orb-verified humans only) | Implemented |
 | AgentKit harvester — claims Merkl, swaps WLD→USDC, redeposits | Implemented |
+| Uniswap Trading API — pre-harvest swap quotes + profitability gating | Implemented |
 | Next.js 15 World Mini App with MiniKit 2.0 | Deployed |
 | Permit2 atomic approve+deposit | Implemented |
 | Terminal UI with progressive disclosure | Implemented |
@@ -95,14 +96,15 @@ docs/         Product spec, technical design, pitch, infra
 | Best Use of AgentKit | $8,000 | Agent IS the strategist — claims, swaps, redeposits autonomously using AgentKit + x402 |
 | Best Use of World ID | $8,000 | World ID gates deposits. Only Orb-verified humans. Sybil-proof vault. |
 | Best Use of MiniKit | $4,000 | Permit2 atomic approve+deposit, walletAuth, IDKit verify — deep MiniKit integration |
+| Best Uniswap API Integration | $10,000 | Agent uses Uniswap Trading API for swap intelligence — quotes WLD→USDC before harvest, gates on profitability |
 
 ## Demo
 
-Open Harvest in World App → verify human (World ID orb) → `vaults` → `deposit 50 usdc` → `portfolio` → `agent status` → `agent harvest`
+Open Harvest in World App → verify human (World ID orb) → `vaults` → `deposit 50 usdc` → `portfolio` → `agent status` (shows Uniswap swap estimate) → `agent harvest` (quotes WLD→USDC via Uniswap API before executing)
 
 ## Contracts
 
-Forked from [beefyfinance/beefy-contracts](https://github.com/beefyfinance/beefy-contracts) (MIT licensed, battle-tested, $billions TVL). Modifications: World ID deposit gate, Permit2 transfer path, Uniswap V3 swap routing for World Chain.
+Forked from [beefyfinance/beefy-contracts](https://github.com/beefyfinance/beefy-contracts) (MIT licensed, battle-tested, $billions TVL). Modifications: World ID deposit gate, Permit2 transfer path, Uniswap V3 swap routing for World Chain. The agent uses the [Uniswap Trading API](https://hub.uniswap.org) for swap intelligence — quoting WLD→USDC before each harvest to verify profitability.
 
 ## Docs
 
@@ -116,3 +118,215 @@ Forked from [beefyfinance/beefy-contracts](https://github.com/beefyfinance/beefy
 | [Cloud Architecture](docs/cloud-architecture.md) | Hosting, deployment, agent runtime, infra decisions |
 | [AgentBook Integration](docs/agentbook-integration.md) | How the vault verifies human-backed agents via AgentKit |
 | [Infra Checklist](docs/infra-checklist.md) | Setup tasks — Developer Portal, wallets, Vercel, Supabase |
+| [Security Audit](docs/security-audit.md) | On-chain state verification, API surface, deployment hygiene |
+
+---
+
+## Proof of Work
+
+This section exists for one reason: to show judges we went all-in.
+
+### Development Velocity
+
+| Metric | Count |
+|--------|-------|
+| Total commits | **152** |
+| Merged pull requests | **92** |
+| GitHub issues tracked | **90+** |
+| Lines of code (Solidity + TypeScript) | **2,809** |
+| Build window | **36 hours** (ETHGlobal Cannes, Apr 3–5 2026) |
+
+[View commit frequency →](https://github.com/ElliotFriedman/harvest-world/graphs/commit-activity)
+
+**Timeline:**
+- **Friday midnight** — contracts forked, stripped, and deployed to World Chain mainnet
+- **Saturday noon** — full mini app running end-to-end with deposit and World ID verification
+- **Saturday evening** — AgentKit harvester live, Uniswap Trading API integrated, streaming yield display shipped
+- **Sunday 5AM** — security audit + Certora specs completed
+
+---
+
+### Merged Pull Requests
+
+<details>
+<summary>92 merged PRs across 8 categories — click to expand</summary>
+
+#### Infrastructure & CI
+| PR | Description |
+|----|-------------|
+| [#25](https://github.com/ElliotFriedman/harvest-world/pull/25) | docs: add and clean up docs directory |
+| [#28](https://github.com/ElliotFriedman/harvest-world/pull/28) | feat: test infrastructure with shared deployer library and CI |
+| [#32](https://github.com/ElliotFriedman/harvest-world/pull/32) | feat: deploy contracts to World Chain mainnet |
+| [#39](https://github.com/ElliotFriedman/harvest-world/pull/39) | ci: add app install + build jobs to CI pipeline |
+| [#46](https://github.com/ElliotFriedman/harvest-world/pull/46) | docs: add README |
+
+#### Contracts — Beefy Fork + World Chain
+| PR | Description |
+|----|-------------|
+| [#26](https://github.com/ElliotFriedman/harvest-world/pull/26) | feat: sybil resistance, Permit2 deposits, World ID + test infra |
+| [#27](https://github.com/ElliotFriedman/harvest-world/pull/27) | cleanup: local branch cleanup |
+| [#29](https://github.com/ElliotFriedman/harvest-world/pull/29) | feat: allow human-backed agents to deposit via AgentBook |
+| [#30](https://github.com/ElliotFriedman/harvest-world/pull/30) | fix: access control hardening for withdraw and harvest |
+| [#31](https://github.com/ElliotFriedman/harvest-world/pull/31) | fmt: formatting pass |
+| [#33](https://github.com/ElliotFriedman/harvest-world/pull/33) | add: deployed contract addresses to spec |
+| [#50](https://github.com/ElliotFriedman/harvest-world/pull/50) | remove: on-chain human verification from vault |
+| [#51](https://github.com/ElliotFriedman/harvest-world/pull/51) | fix: add Multicall3 address to fix portfolio 500 error |
+| [#52](https://github.com/ElliotFriedman/harvest-world/pull/52) | feat: TransparentUpgradeableProxy for vault, strategy, and swapper |
+| [#53](https://github.com/ElliotFriedman/harvest-world/pull/53) | fix: atomic proxy init in HarvestDeployer + rename Moo → Harvest |
+
+#### World ID Integration
+| PR | Description |
+|----|-------------|
+| [#38](https://github.com/ElliotFriedman/harvest-world/pull/38) | fix: progressive disclosure + connect wallet button |
+| [#41](https://github.com/ElliotFriedman/harvest-world/pull/41) | fix: require wallet before deposit to prevent ProofInvalid |
+| [#44](https://github.com/ElliotFriedman/harvest-world/pull/44) | fix: signal staleness bug + single-tap get started flow |
+| [#47](https://github.com/ElliotFriedman/harvest-world/pull/47) | fix: ABI-decode World ID proof (root cause of simulation_failed) |
+| [#48](https://github.com/ElliotFriedman/harvest-world/pull/48) | debug: exhaustive logging to diagnose simulation_failed |
+| [#49](https://github.com/ElliotFriedman/harvest-world/pull/49) | fix: downgrade IDKit to v2 for V3-compatible on-chain World ID proofs |
+
+#### Permit2 Debugging (11 iterations to mainnet)
+| PR | Description |
+|----|-------------|
+| [#54](https://github.com/ElliotFriedman/harvest-world/pull/54) | fix: Permit2 allowance expiration causing deposit revert |
+| [#55](https://github.com/ElliotFriedman/harvest-world/pull/55) | fix: lazy-load IDKit to prevent white screen in World App |
+| [#56](https://github.com/ElliotFriedman/harvest-world/pull/56) | fix: set Permit2 expiration to 0 per World docs |
+| [#59](https://github.com/ElliotFriedman/harvest-world/pull/59) | fix: Permit2 expiration timestamp, bump v1.6 |
+| [#60](https://github.com/ElliotFriedman/harvest-world/pull/60) | fix: reduce Permit2 expiration to 15s, bump v1.7 |
+| [#62](https://github.com/ElliotFriedman/harvest-world/pull/62) | fix: Permit2 expiration to current timestamp, bump v1.8 |
+| [#63](https://github.com/ElliotFriedman/harvest-world/pull/63) | fix: balance-aware deposit picker, guard against insufficient funds |
+| [#64](https://github.com/ElliotFriedman/harvest-world/pull/64) | fix: Permit2 expiration now+2s, bump v1.9 |
+| [#66](https://github.com/ElliotFriedman/harvest-world/pull/66) | debug: Permit2 expiration=0 for Tenderly trace, bump v2.0 |
+| [#67](https://github.com/ElliotFriedman/harvest-world/pull/67) | fix: correct vault address + restore Permit2 expiration, v2.1 |
+| [#71](https://github.com/ElliotFriedman/harvest-world/pull/71) | fix: set Permit2 expiration to 0 per World docs (final) |
+
+#### Mini App & Terminal UI
+| PR | Description |
+|----|-------------|
+| [#34](https://github.com/ElliotFriedman/harvest-world/pull/34) | feat: functional mini app with deposit, withdraw, portfolio |
+| [#42](https://github.com/ElliotFriedman/harvest-world/pull/42) | fix: compact vaults display for mobile |
+| [#43](https://github.com/ElliotFriedman/harvest-world/pull/43) | fix: add brand assets and metadata to Next.js app |
+| [#57](https://github.com/ElliotFriedman/harvest-world/pull/57) | fix: rename vault shares label to hvUSDC, bump version to v1.5 |
+| [#58](https://github.com/ElliotFriedman/harvest-world/pull/58) | docs: remove Supabase, update constraints, add brand assets |
+| [#70](https://github.com/ElliotFriedman/harvest-world/pull/70) | feat: easter egg with typewriter animation |
+
+#### Agent & Harvester
+| PR | Description |
+|----|-------------|
+| [#45](https://github.com/ElliotFriedman/harvest-world/pull/45) | feat: implement harvester agent API + terminal commands |
+| [#69](https://github.com/ElliotFriedman/harvest-world/pull/69) | fix: wire agent status to real Merkl API, fix addresses |
+| [#73](https://github.com/ElliotFriedman/harvest-world/pull/73) | fix: wire agent status/harvest to real API, fix harvester addresses, v2.3 |
+| [#74](https://github.com/ElliotFriedman/harvest-world/pull/74) | feat: show total USD value as wallet USDC + vault shares |
+| [#76](https://github.com/ElliotFriedman/harvest-world/pull/76) | feat: AgentKit harvester + burner wallet setup |
+
+#### Features
+| PR | Description |
+|----|-------------|
+| [#91](https://github.com/ElliotFriedman/harvest-world/pull/91) | feat: integrate Uniswap Trading API for swap intelligence |
+| [#92](https://github.com/ElliotFriedman/harvest-world/pull/92) | feat: show streaming yield unlock countdown in agent status |
+
+#### Security & Docs
+| PR | Description |
+|----|-------------|
+| [#86](https://github.com/ElliotFriedman/harvest-world/pull/86) | docs: internal security audit |
+
+</details>
+
+---
+
+### Issues: Done vs. Roadmap
+
+#### Completed
+
+| Issue | Description |
+|-------|-------------|
+| [#1](https://github.com/ElliotFriedman/harvest-world/issues/1) | Set up World Developer Portal app |
+| [#2](https://github.com/ElliotFriedman/harvest-world/issues/2) | Set up deployer + agent wallets |
+| [#3](https://github.com/ElliotFriedman/harvest-world/issues/3) | Set up Vercel + environment |
+| [#4](https://github.com/ElliotFriedman/harvest-world/issues/4) | Fork Beefy contracts and strip for World Chain |
+| [#5](https://github.com/ElliotFriedman/harvest-world/issues/5) | Deploy contracts to World Chain mainnet |
+| [#6](https://github.com/ElliotFriedman/harvest-world/issues/6) | Write and run contract tests |
+| [#7](https://github.com/ElliotFriedman/harvest-world/issues/7) | Scaffold Next.js mini app + terminal UI shell |
+| [#8](https://github.com/ElliotFriedman/harvest-world/issues/8) | Implement World ID + wallet auth in terminal |
+| [#9](https://github.com/ElliotFriedman/harvest-world/issues/9) | Implement terminal commands: portfolio, vaults |
+| [#10](https://github.com/ElliotFriedman/harvest-world/issues/10) | Implement terminal commands: deposit, withdraw |
+| [#11](https://github.com/ElliotFriedman/harvest-world/issues/11) | Build harvester agent (cron + harvest call) |
+| [#12](https://github.com/ElliotFriedman/harvest-world/issues/12) | Integrate AgentKit for agent identity |
+| [#19](https://github.com/ElliotFriedman/harvest-world/issues/19) | Set up domain name + live deployment for judges |
+| [#24](https://github.com/ElliotFriedman/harvest-world/issues/24) | Implement AgentKit deposit gate for human-backed agents |
+| [#35](https://github.com/ElliotFriedman/harvest-world/issues/35) | Verify portfolio decimal math with real deposit |
+
+#### Roadmap
+
+**Security hardening (all findings tracked from internal audit):**
+[#78](https://github.com/ElliotFriedman/harvest-world/issues/78) strategy owner EOA ·
+[#79](https://github.com/ElliotFriedman/harvest-world/issues/79) slippage protection ·
+[#80](https://github.com/ElliotFriedman/harvest-world/issues/80) claim() access control ·
+[#81](https://github.com/ElliotFriedman/harvest-world/issues/81) isolate AGENT_PRIVATE_KEY ·
+[#82](https://github.com/ElliotFriedman/harvest-world/issues/82) harden API endpoints ·
+[#83](https://github.com/ElliotFriedman/harvest-world/issues/83) stale address references ·
+[#84](https://github.com/ElliotFriedman/harvest-world/issues/84) reentrancy guard + timelock ·
+[#85](https://github.com/ElliotFriedman/harvest-world/issues/85) deployment hygiene
+
+**Stretch features:**
+[#17](https://github.com/ElliotFriedman/harvest-world/issues/17) WLD vault ·
+[#21](https://github.com/ElliotFriedman/harvest-world/issues/21) harvest notifications ·
+[#23](https://github.com/ElliotFriedman/harvest-world/issues/23) DeFiLlama TVL adapter ·
+[#37](https://github.com/ElliotFriedman/harvest-world/issues/37) multi-vault architecture ·
+[#75](https://github.com/ElliotFriedman/harvest-world/issues/75) permissionless harvesting via on-chain AgentKit gating
+
+---
+
+### Deep On-Chain Investigation
+
+We didn't guess at hard problems — we instrumented them and found the root cause.
+
+**World ID V3/V4 Incompatibility** — [`docs/verify-simulation-failure-root-cause.md`](docs/verify-simulation-failure-root-cause.md)
+
+8 PRs (plus a [public help request](https://github.com/ElliotFriedman/harvest-world/pull/65)) debugging `simulation_failed` on `verifyHuman()`. We probed the WorldIDRouter on-chain via `cast`, discovered the World Chain V4 verifier only maintains 7-day rolling V4 Merkle roots (never imported V3 roots), and confirmed the exact failure mode by testing with the live registered root (`0x082d67...`): using the correct root with a fake proof yields `ProofInvalid()` — a different error — proving the root check passes when fed a V4 root. The V3 root from `orbLegacy()` gives `NonExistentRoot()` because it's from a different Merkle tree entirely. Full write-up with on-chain evidence, error selectors, and fix options documents why each candidate fix was ruled out.
+
+**Permit2 Expiration** — 11 PRs, each deployed and tested live on World Chain mainnet, iterating through every documented expiration value (0, 2s, 15s, 60s, 24h, current timestamp) until finding the one the `sendTransaction` simulation accepts.
+
+---
+
+### Security
+
+**AI-Powered Internal Security Audit** — [`docs/security-audit.md`](docs/security-audit.md)
+
+A team of review agents audited the deployed system across three surfaces: on-chain contract state (all 3 proxy contracts verified via `cast` against Alchemy RPC), off-chain API surface (all Next.js routes), and deployment hygiene. Every finding is documented with a specific file path, line number, on-chain evidence, and a production remediation path.
+
+| Severity | Count |
+|----------|-------|
+| MEDIUM | 8 |
+| LOW | 13 |
+| INFO | 5 |
+
+All 26 findings are acknowledged and tracked as GitHub issues [#78](https://github.com/ElliotFriedman/harvest-world/issues/78)–[#85](https://github.com/ElliotFriedman/harvest-world/issues/85).
+
+---
+
+**Certora Formal Verification** — branch [`feat/certora-formal-specs`](https://github.com/ElliotFriedman/harvest-world/tree/feat/certora-formal-specs)
+
+We wrote Certora Prover specs (CVL2) for all 4 core contracts. Formal verification uses mathematical proof to check properties hold for every possible input in every reachable state — not just the cases unit tests happen to cover.
+
+| Contract | Spec | Rules |
+|----------|------|-------|
+| `BeefyVaultV7` | `certora/specs/BeefyVaultV7.spec` | 17 rules — share arithmetic, round-trip safety, access control, price-per-share monotonicity |
+| `BaseAllToNativeFactoryStrat` | `certora/specs/BaseStrategy.spec` | 16 rules — locked-profit decay, pause safety, access control for every privileged function |
+| `StrategyMorphoMerkl` | `certora/specs/StrategyMorphoMerkl.spec` | 11 rules — Morpho pool monotonicity, reward token safety, Merkl claim atomicity |
+| `BeefySwapper` | `certora/specs/BeefySwapper.spec` | 15 rules — slippage invariants, swap revert safety, oracle/route access control |
+
+Each contract has a harness (exposing internal state as external views), mock contracts (Morpho vault, Merkl claimer, oracle, ERC-20), and a `.conf` file for the Certora cloud runner. Run all: `bash certora/run_all.sh`
+
+---
+
+### AI Tooling Used in Development
+
+We used first-party AI tooling from both prize sponsors as active development infrastructure — not just for code completion.
+
+- **World MCP Server** — queried World ID docs, verified contract addresses, and retrieved integration guidance in-IDE throughout the entire build
+- **Uniswap MCP + AI Skill** — used for Uniswap V3 swap route design, Trading API integration, and WLD→USDC path configuration
+
+```bash
+# Uniswap AI skill used during development
+npx skills add uniswap/uniswap-ai --skill swap-integration
+```

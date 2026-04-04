@@ -170,7 +170,8 @@ The World Mini App FAQ explicitly states: **"Mini apps must be developed on main
     RP_SIGNING_KEY=0x...                 # Server-only signing key (never expose to browser)
 
     # Contracts — World Chain mainnet (chainId 480)
-    NEXT_PUBLIC_VAULT_ADDRESS=0x512ce44e4f69a98bc42a57ced8257e65e63cd74f  # Harvest vault proxy
+    NEXT_PUBLIC_VAULT_ADDRESS=0x512ce44e4f69a98bc42a57ced8257e65e63cd74f      # Harvest vault proxy
+    NEXT_PUBLIC_STRATEGY_ADDRESS=0x313bA1D5D5AA1382a80BA839066A61d33C110489  # Harvest strategy proxy
 
     # RPC — server-only (used by /api/balances)
     RPC_URL=https://worldchain-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY

@@ -9,12 +9,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import {
   STRATEGY_ADDRESS,
   VAULT_ADDRESS,
+  WLD_ADDRESS,
   strategyAbi,
   vaultAbi,
   harvestStore,
   fetchMerklRewards,
   formatWldAmount,
 } from "../../../../lib/harvester";
+import { fetchUniswapQuote } from "../../../../lib/uniswap";
 
 // Server-only — RPC_URL never exposed to browser
 const RPC_URL = process.env.RPC_URL || "https://worldchain.drpc.org";
@@ -31,7 +33,21 @@ const publicClient = createPublicClient({
   transport: http(RPC_URL),
 });
 
+// Vercel Cron sends GET requests
+export async function GET(request: Request) {
+  // Verify the request is from Vercel Cron
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return harvest();
+}
+
 export async function POST() {
+  return harvest();
+}
+
+async function harvest() {
   // 1. Check for agent private key
   const agentKey = process.env.AGENT_PRIVATE_KEY;
   if (!agentKey) {
@@ -56,6 +72,13 @@ export async function POST() {
         message: "No unclaimed Merkl rewards for the strategy.",
       });
     }
+
+    // Uniswap quote — estimate swap output
+    const wldRewards = rewards.filter(
+      (r) => r.token.toLowerCase() === WLD_ADDRESS.toLowerCase()
+    );
+    const totalWld = wldRewards.reduce((sum: bigint, r: any) => sum + r.unclaimed, BigInt(0));
+    const uniswapQuote = await fetchUniswapQuote(totalWld);
 
     // 3. Build claim parameters from rewards
     const tokens = rewards.map((r) => r.token as `0x${string}`);
@@ -119,8 +142,9 @@ export async function POST() {
     const record = {
       timestamp: new Date().toISOString(),
       txHash: harvestHash,
-      wantEarned: "-- USDC", // exact amount requires event parsing
+      wantEarned: uniswapQuote?.expectedOutput ?? "-- USDC",
       rewardsClaimed: rewardsSummary,
+      uniswapQuote,
     };
     harvestStore.push(record);
 
@@ -132,6 +156,7 @@ export async function POST() {
       wantEarned: record.wantEarned,
       newSharePrice: priceAfter.toString(),
       oldSharePrice: priceBefore.toString(),
+      uniswapQuote,
     });
   } catch (err) {
     console.error("Harvest error:", err);

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type { IDKitResult, IDKitErrorCodes, RpContext } from "@worldcoin/idkit";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData } from "viem";
-import { getBalances, getVaultTvl } from "../lib/client";
+import { getBalances, getVaultTvl, getAgentStatus, triggerHarvest } from "../lib/client";
 
 // Lazy-load IDKit to prevent crashes in World App webview
 const LazyIDKit = dynamic(
@@ -78,7 +78,7 @@ function formatBigintUSDC(raw: bigint): string {
 
 export default function Terminal() {
   const [lines, setLines] = useState<string[]>([
-    "HARVEST v2.1 — Agentic DeFi, for humans.",
+    "HARVEST v2.4 — Agentic DeFi, for humans.",
     "World Chain yield aggregator.",
     "",
   ]);
@@ -108,6 +108,18 @@ export default function Terminal() {
   const print = useCallback((...newLines: string[]) => {
     setLines((prev) => [...prev, ...newLines]);
   }, []);
+
+  async function typewriterPrint(text: string, delayMs = 28): Promise<void> {
+    setLines((prev) => [...prev, ""]);
+    for (let i = 1; i <= text.length; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      setLines((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = text.slice(0, i);
+        return updated;
+      });
+    }
+  }
 
   // ── Command handlers ────────────────────────────────────────────────────────
 
@@ -284,13 +296,15 @@ export default function Terminal() {
 
       if (vaultShares > BigInt(0)) setHasShares(true);
 
-      const usdValue = (vaultShares * pricePerShare) / BigInt(1e18);
+      const vaultUsdValue = (vaultShares * pricePerShare) / BigInt(1e18);
+      const totalUsdValue = usdcBalance + vaultUsdValue;
 
       print(
         `Portfolio for ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
         `  USDC in wallet: $${formatBigintUSDC(usdcBalance)}`,
         `  Vault shares:   ${formatBigintUSDC(vaultShares)} hvUSDC`,
-        `  USD value:      $${formatBigintUSDC(usdValue)}`,
+        `  Vault USD value: $${formatBigintUSDC(vaultUsdValue)}`,
+        `  Total USD value: $${formatBigintUSDC(totalUsdValue)}`,
         ""
       );
     } catch {
@@ -299,19 +313,98 @@ export default function Terminal() {
   }
 
   async function handleAgentStatus() {
-    print(
-      "HARVESTER AGENT",
-      "  Status:         ● ACTIVE",
-      "  Last harvest:   never",
-      "  Next check:     in ~6h",
-      "  Pending yield:  0 WLD",
-      ""
-    );
+    print("Loading agent status...");
+    try {
+      const s = await getAgentStatus();
+
+      const lastHarvestStr = s.lastHarvest
+        ? `${new Date(s.lastHarvest.timestamp).toLocaleString()} (+$${s.lastHarvest.wantEarned})`
+        : "never";
+
+      const nextCheckStr = (() => {
+        const ms = new Date(s.nextCheck).getTime() - Date.now();
+        if (ms <= 0) return "soon";
+        const h = Math.floor(ms / 3600_000);
+        const m = Math.floor((ms % 3600_000) / 60_000);
+        return h > 0 ? `in ~${h}h` : `in ~${m}m`;
+      })();
+
+      const poolUSD = s.balanceOfPool
+        ? `$${(Number(s.balanceOfPool) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : "--";
+
+      const rewardStr = s.pendingRewards
+        ? `${s.pendingRewards.amount} ($${s.pendingRewards.usdValue.toFixed(2)})`
+        : "0 WLD";
+
+      const swapEstimate = s.uniswapQuote
+        ? `~${s.uniswapQuote.expectedOutput} (impact: ${s.uniswapQuote.priceImpact}%)`
+        : "";
+
+      const streamingStr = (() => {
+        if (!s.streaming) return null;
+        const h = Math.floor(s.streaming.unlocksInMs / 3_600_000);
+        const m = Math.floor((s.streaming.unlocksInMs % 3_600_000) / 60_000);
+        const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+        return `streaming $${s.streaming.lockedUsd} USDC to depositors — fully unlocked in ${timeStr}`;
+      })();
+
+      print(
+        "HARVESTER AGENT",
+        `  Status:         ● ${s.status.toUpperCase()}`,
+        `  Pool balance:   ${poolUSD}`,
+        `  Pending yield:  ${rewardStr}`,
+        ...(swapEstimate ? [`  Swap estimate:  ${swapEstimate}`] : []),
+        ...(streamingStr ? [`  Yield stream:   ${streamingStr}`] : []),
+        `  Last harvest:   ${lastHarvestStr}`,
+        `  Next check:     ${nextCheckStr}`,
+        ""
+      );
+    } catch {
+      print("Error loading agent status. Try again.", "");
+    }
   }
 
   async function handleAgentHarvest() {
-    print("Triggering manual harvest...");
-    print("No pending rewards above threshold.", "");
+    print("Triggering harvest...");
+    try {
+      const result = await triggerHarvest();
+      if (result.success) {
+        const quoteLine = result.uniswapQuote
+          ? `  Swap quote:    ${result.uniswapQuote.expectedOutput} (via Uniswap ${result.uniswapQuote.routing})`
+          : "";
+        print(
+          "Harvest complete.",
+          result.wantEarned ? `  Yield earned:  +$${result.wantEarned}` : "",
+          result.rewardsClaimed ? `  Rewards:       ${result.rewardsClaimed}` : "",
+          ...(quoteLine ? [quoteLine] : []),
+          result.txHash ? `  Tx: ${result.txHash.slice(0, 10)}...` : "",
+          ""
+        );
+      } else {
+        const reason = result.message ?? result.reason ?? "unknown";
+        print(`Harvest skipped: ${reason}`, "");
+      }
+    } catch {
+      print("Error triggering harvest. Try again.", "");
+    }
+  }
+
+  // ── Easter egg ──────────────────────────────────────────────────────────────
+
+  async function handleEasterEgg() {
+    await typewriterPrint("* you found the easter egg. congrats. *");
+    await new Promise((r) => setTimeout(r, 500));
+    print("");
+    await typewriterPrint("we wanted to add the wonder back into finance.");
+    await new Promise((r) => setTimeout(r, 200));
+    await typewriterPrint("the feeling of getting a new computer.");
+    await new Promise((r) => setTimeout(r, 200));
+    await typewriterPrint("and entering a whole new world...");
+    await new Promise((r) => setTimeout(r, 600));
+    print("");
+    await typewriterPrint("we hope you enjoy :)");
+    print("");
   }
 
   // ── Deposit picker flow ──────────────────────────────────────────────────────
@@ -423,7 +516,8 @@ export default function Terminal() {
     try {
       const amountRaw = BigInt(Math.floor(amount * 1e6));
 
-      const expiration = Math.floor(Date.now() / 1000) + 60; // 1 minute from now
+      // set to zero per world docs.
+      const expiration = 0;
       const approveCalldata = encodeFunctionData({
         abi: PERMIT2_APPROVE_ABI,
         functionName: "approve",
@@ -564,6 +658,8 @@ export default function Terminal() {
       await handleAgentHarvest();
     } else if (cmd === "clear") {
       setLines([]);
+    } else if (trimmed === "easter egg") {
+      await handleEasterEgg();
     } else {
       print(`Unknown command: '${cmd}'. Type 'help' for options.`, "");
     }
