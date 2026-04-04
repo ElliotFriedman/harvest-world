@@ -120,11 +120,30 @@ export default function Terminal() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
 
-  // Grab wallet address from MiniKit
+  // Connect wallet via MiniKit on mount
   useEffect(() => {
-    if (MiniKit.isInstalled()) {
-      setWalletAddress(MiniKit.user?.walletAddress ?? null);
+    async function connect() {
+      if (!MiniKit.isInstalled()) return;
+
+      // If already authed, use cached address
+      if (MiniKit.user?.walletAddress) {
+        setWalletAddress(MiniKit.user.walletAddress);
+        return;
+      }
+
+      try {
+        const result = await MiniKit.walletAuth({
+          nonce: crypto.randomUUID().replace(/-/g, ""),
+          statement: "Sign in to Harvest",
+        });
+        if (result?.data?.address) {
+          setWalletAddress(result.data.address);
+        }
+      } catch {
+        // User rejected or MiniKit not ready — silently continue
+      }
     }
+    connect();
   }, []);
 
   const print = useCallback((...newLines: string[]) => {
