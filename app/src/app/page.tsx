@@ -13,9 +13,13 @@ const LazyIDKit = dynamic(
   { ssr: false }
 );
 
+// Lazy-load QRCode to prevent SSR issues
+const LazyQRCode = dynamic(() => import("react-qr-code"), { ssr: false });
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const APP_ID = process.env.NEXT_PUBLIC_APP_ID as `app_${string}`;
+const WORLD_APP_URL = "https://world.org/mini-app?app_id=app_4e0a09224d5cc08fca4cd09ef101f966&path=&draft_id=meta_27112de32ce4d4d895106f8225e828c7";
 const VAULT_ADDRESS = (process.env.NEXT_PUBLIC_VAULT_ADDRESS ??
   "0x0000000000000000000000000000000000000000") as `0x${string}`;
 const USDC_ADDRESS = "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" as const;
@@ -58,6 +62,21 @@ const WITHDRAW_ABI = [
   },
 ] as const;
 
+// ─── Oracle fortunes ─────────────────────────────────────────────────────────
+
+const ORACLE_FORTUNES = [
+  "compound interest is the eighth wonder of the world.",
+  "the harvest comes to those who plant.",
+  "your yield grows while you sleep.",
+  "one harvest tx. a thousand individual claims. same result.",
+  "every depositor is a verified human. no bots. no farms.",
+  "defi, for humans.",
+  "the agent works so you don't have to.",
+  "a rising tide lifts all vaults.",
+  "yield is patient. so is the agent.",
+  "trust the math, not the middleman.",
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatUSDC(amount: number): string {
@@ -77,11 +96,7 @@ function formatBigintUSDC(raw: bigint): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Terminal() {
-  const [lines, setLines] = useState<string[]>([
-    "HARVEST v2.4 — Agentic DeFi, for humans.",
-    "World Chain yield aggregator.",
-    "",
-  ]);
+  const [lines, setLines] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [pendingDeposit, setPendingDeposit] = useState<number | null>(null);
   const [idkitOpen, setIdkitOpen] = useState(false);
@@ -91,6 +106,8 @@ export default function Terminal() {
   const [hasShares, setHasShares] = useState(false);
   const [depositMode, setDepositMode] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<bigint>(BigInt(0));
+  const [isFlickering, setIsFlickering] = useState(false);
+  const [isObserverMode, setIsObserverMode] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -99,10 +116,19 @@ export default function Terminal() {
   }, [lines]);
 
   useEffect(() => {
-    if (!MiniKit.isInstalled()) return;
-    if (MiniKit.user?.walletAddress) {
-      setWalletAddress(MiniKit.user.walletAddress);
+    if (MiniKit.isInstalled()) {
+      if (MiniKit.user?.walletAddress) {
+        setWalletAddress(MiniKit.user.walletAddress);
+      }
+      setLines([
+        "HARVEST v2.4 — Agentic DeFi, for humans.",
+        "World Chain yield aggregator.",
+        "",
+      ]);
+    } else {
+      runObserverBoot();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const print = useCallback((...newLines: string[]) => {
@@ -121,6 +147,49 @@ export default function Terminal() {
     }
   }
 
+  async function flicker(): Promise<void> {
+    setIsFlickering(true);
+    await new Promise((r) => setTimeout(r, 70));
+    setIsFlickering(false);
+    await new Promise((r) => setTimeout(r, 40));
+    setIsFlickering(true);
+    await new Promise((r) => setTimeout(r, 50));
+    setIsFlickering(false);
+  }
+
+  async function runObserverBoot(): Promise<void> {
+    await flicker();
+    await typewriterPrint("HARVEST OS v2.4");
+    await new Promise((r) => setTimeout(r, 300));
+    await typewriterPrint("initializing...");
+    await new Promise((r) => setTimeout(r, 500));
+    await flicker();
+    setLines((prev) => [...prev, ""]);
+    await typewriterPrint("> checking World App... [not installed]");
+    await new Promise((r) => setTimeout(r, 300));
+    await typewriterPrint("> falling back to observer mode");
+    await new Promise((r) => setTimeout(r, 600));
+    setLines((prev) => [...prev, ""]);
+    await typewriterPrint("This terminal runs inside World App.");
+    await new Promise((r) => setTimeout(r, 200));
+    await typewriterPrint("You're seeing the outside.");
+    await new Promise((r) => setTimeout(r, 600));
+    setLines((prev) => [...prev, ""]);
+    await typewriterPrint("The humans are inside, earning yield.");
+    await new Promise((r) => setTimeout(r, 200));
+    await typewriterPrint("Scan to join them.");
+    setLines((prev) => [
+      ...prev,
+      "",
+      "  open in World App:",
+      `  ${WORLD_APP_URL}`,
+      "",
+    ]);
+    await typewriterPrint("Type 'help' to explore. Type 'scan' for the deeplink.");
+    setLines((prev) => [...prev, ""]);
+    setIsObserverMode(true);
+  }
+
   // ── Command handlers ────────────────────────────────────────────────────────
 
   async function handleHelp() {
@@ -131,6 +200,10 @@ export default function Terminal() {
       "  withdraw all   — exit position",
       "  portfolio      — your balance",
       "  agent status   — harvester info",
+      "  gm             — morning yield check",
+      "  oracle         — consult the oracle",
+      "  roots          — proof of humanity tree",
+      "  scan           — deeplink to World App",
       "  clear          — clear screen",
       ""
     );
@@ -388,6 +461,91 @@ export default function Terminal() {
     } catch {
       print("Error triggering harvest. Try again.", "");
     }
+  }
+
+  // ── New commands ─────────────────────────────────────────────────────────────
+
+  async function handleGm() {
+    try {
+      const s = await getAgentStatus();
+
+      const poolUSD = s.balanceOfPool
+        ? `$${(Number(s.balanceOfPool) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : "--";
+
+      const pendingStr = s.pendingRewards
+        ? `${s.pendingRewards.amount} WLD ($${s.pendingRewards.usdValue.toFixed(2)})`
+        : "0 WLD ($0.00)";
+
+      const lastHarvestStr = s.lastHarvest
+        ? new Date(s.lastHarvest.timestamp).toLocaleString()
+        : "never";
+
+      const nextCheckStr = (() => {
+        const ms = new Date(s.nextCheck).getTime() - Date.now();
+        if (ms <= 0) return "soon";
+        const h = Math.floor(ms / 3600_000);
+        const m = Math.floor((ms % 3600_000) / 60_000);
+        return h > 0 ? `~${h}h` : `~${m}m`;
+      })();
+
+      print(
+        "gm. yield is compounding.",
+        `  pool:          ${poolUSD}`,
+        `  pending yield: ${pendingStr}`,
+        `  last harvest:  ${lastHarvestStr}`,
+        `  next check:    in ${nextCheckStr}`,
+        ""
+      );
+    } catch {
+      print("gm. yield is compounding.", "");
+    }
+  }
+
+  async function handleOracle() {
+    const fortune = ORACLE_FORTUNES[Math.floor(Math.random() * ORACLE_FORTUNES.length)];
+    print("> consulting the oracle...");
+    await new Promise((r) => setTimeout(r, 600));
+    setLines((prev) => [...prev, ""]);
+    await typewriterPrint(fortune);
+    setLines((prev) => [...prev, ""]);
+  }
+
+  async function handleRoots() {
+    print(
+      "HARVEST VAULT — proof of humanity",
+      "─────────────────────────────────",
+      "        [vault]",
+      "           │",
+      "    ┌──────┴──────┐",
+      "    │             │",
+      "[human]       [human]",
+      "    │             │",
+      " Orb ✓         Orb ✓",
+      "",
+      "Every depositor is Orb-verified.",
+      "No bots. No sybil farming.",
+      "The vault cryptographically guarantees",
+      "every dollar traces to a unique human.",
+      "",
+      "World ID router: 0x17B354dD...",
+      ""
+    );
+  }
+
+  async function handleScan() {
+    print(
+      "┌─────────────────────────────────────┐",
+      "│  Open Harvest in World App          │",
+      "│                                     │",
+      "│  Scan the QR code on desktop, or:  │",
+      "│                                     │",
+      `│  ${WORLD_APP_URL.slice(0, 37)}  │`,
+      "│                                     │",
+      "│  Or search \"Harvest\" in World App.  │",
+      "└─────────────────────────────────────┘",
+      ""
+    );
   }
 
   // ── Easter egg ──────────────────────────────────────────────────────────────
@@ -656,6 +814,14 @@ export default function Terminal() {
       await handleAgentStatus();
     } else if (cmd === "agent" && args[0] === "harvest") {
       await handleAgentHarvest();
+    } else if (cmd === "gm") {
+      await handleGm();
+    } else if (cmd === "oracle") {
+      await handleOracle();
+    } else if (cmd === "roots") {
+      await handleRoots();
+    } else if (cmd === "scan") {
+      await handleScan();
     } else if (cmd === "clear") {
       setLines([]);
     } else if (trimmed === "easter egg") {
@@ -724,6 +890,8 @@ export default function Terminal() {
         flexDirection: "column",
         padding: "10px",
         overflow: "hidden",
+        opacity: isFlickering ? 0 : 1,
+        transition: "opacity 0ms",
       }}
       onClick={() => inputRef.current?.focus()}
     >
@@ -792,6 +960,46 @@ export default function Terminal() {
           autoCorrect="off"
         />
       </div>
+
+      {/* QR code panel — desktop only, observer mode only */}
+      {isObserverMode && (
+        <>
+          <style>{`
+            .harvest-qr-panel { display: none; }
+            @media (min-width: 768px) { .harvest-qr-panel { display: flex; } }
+          `}</style>
+          <div
+            className="harvest-qr-panel"
+            style={{
+              position: "fixed",
+              top: "50%",
+              right: "40px",
+              transform: "translateY(-50%)",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "12px",
+              padding: "16px",
+              border: "1px solid #00ff41",
+              background: "#000",
+            }}
+          >
+            <div style={{ fontSize: "11px", color: "#00ff41", letterSpacing: "0.05em" }}>
+              SCAN TO OPEN IN WORLD APP
+            </div>
+            <div style={{ background: "#000", padding: "8px", border: "1px solid #00ff41" }}>
+              <LazyQRCode
+                value={WORLD_APP_URL}
+                size={160}
+                bgColor="#000000"
+                fgColor="#00ff41"
+              />
+            </div>
+            <div style={{ fontSize: "9px", color: "#00ff41", opacity: 0.6, textAlign: "center", maxWidth: "160px" }}>
+              harvest.world // DeFi, for humans
+            </div>
+          </div>
+        </>
+      )}
 
       {/* IDKit v4 widget — backend verification only, no on-chain verifyHuman */}
       {rpContext && walletAddress && (
